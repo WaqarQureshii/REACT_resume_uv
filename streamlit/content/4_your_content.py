@@ -3,8 +3,9 @@ from dependencies import login_user, generate_current_experience
 from form_templates import contact_form
 from google.cloud import firestore
 
-from form_templates import add_experience_form
+from form_templates import experience_form
 from dependencies import get_number_of_existing_experiences
+from firebase_tools import create_firestore_document, get_user_db, upload_firebase_db
 
 
 if not st.experimental_user.is_logged_in:
@@ -24,10 +25,24 @@ else:
 
     #TODO dynamic expander name
     with current_experience_tab:
-        
         generate_current_experience()
         
     with add_experience_tab:
         if st.button("Add Experience", "add_experience_button"):
-            add_experience_form()
+            db = get_user_db()
             current_experience_number = get_number_of_existing_experiences()
+
+            id = current_experience_number+1
+
+            document_title = f"experience_{id:02}"          
+
+            create_firestore_document(db,"current experience", document_title)
+            upload_firebase_db("existing_experience",
+                               document_title,
+                               organization = "",
+                               present =False,
+                               role = "",
+                               start_date = "",
+                               end_date = "",
+                               location="")
+            experience_form(id, existing_experience=False)

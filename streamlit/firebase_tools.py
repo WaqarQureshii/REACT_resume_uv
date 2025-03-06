@@ -12,7 +12,7 @@ def create_user_db(db: firestore.DocumentReference):
         })
 
 
-    #Instantiate Contact Document in Firestore
+    # Instantiate Contact Document in Firestore
     contact_data = {
         "first_name": "",
         "last_name": "",
@@ -27,15 +27,6 @@ def create_user_db(db: firestore.DocumentReference):
 
     contact_collection = db.collection("contact")
     contact_collection.document("contact").set(contact_data)
-
-
-    experience_collection = db.collection("current_experience")
-
-
-    education_collection = db.collection("education")
-
-
-    certification_collection = db.collection("certification")
 
     return db
 
@@ -68,16 +59,17 @@ def upload_firebase_db(firestore_collection_name: str, firestore_document_name:s
     document = db.collection(firestore_collection_name).document(firestore_document_name)
     document.set(fields)
 
-def get_firestore_information(firestore_collection_name: str, firestore_document_name: str, firestore_field):
+def get_firestore_information(firestore_collection_name: str, firestore_document_name: str) -> dict:
     """Get information from the collection(users).document(email)"""
     db = get_user_db()
     document = db.collection(firestore_collection_name).document(firestore_document_name)
     information = document.get().to_dict()
 
-    if information[firestore_field]:
-        return information[firestore_field]
+    if information:
+        return information
     else:
-        return ""
+        information = {}
+        return information
 
 def get_firestore_collection(firestore_collection: str) -> CollectionReference:
     """
@@ -95,3 +87,6 @@ def get_firestore_collection(firestore_collection: str) -> CollectionReference:
     db = get_user_db()
     collection = db.collection(firestore_collection)
     return collection
+
+def create_firestore_document(db: firestore.DocumentReference, firestore_collection_name: str, firestore_document_name: str):
+    firestore_collection_name = db.collection("current_experience").document(firestore_document_name).set({})

@@ -6,7 +6,7 @@ from google.cloud import firestore
 
 
 from firebase_tools import get_user_db, get_firestore_collection
-from form_templates import existing_experience_form
+from form_templates import experience_form
 
 import datetime
 from typing import Optional
@@ -33,9 +33,9 @@ def sidebar_account():
                 login_user()
                 get_user_db()
 
-def create_experience_ui(id, title: Optional[str]=""):
-    with st.expander(f"Experience #{id} {title}"):
-        existing_experience_form(id)
+def create_experience_ui(id: int, existing_experience: bool, title: Optional[str]=""):
+    with st.expander(f"Experience #{f"{id:02}"} {title}"):
+        experience_form(id, existing_experience)
 
 ### --- Global Functions --- ###
 
@@ -46,7 +46,7 @@ def get_number_of_existing_experiences() -> int:
     collection = get_firestore_collection("current_experience")
     no_of_documents = collection.count().get()[0][0].value
 
-    return no_of_documents
+    return int(no_of_documents)
 
 def generate_current_experience():
     """
@@ -60,16 +60,22 @@ def generate_current_experience():
     Returns:
         str: None if no documents are found, otherwise the function does not return a value.
     """
-    collection = get_firestore_collection("current_experience")
-    no_of_documents = collection.count().get()[0][0].value
-    if not any(collection.stream()):
+    experience_collection = get_firestore_collection("current_experience")
+    no_of_documents = experience_collection.count().get()[0][0].value
+    if not any(experience_collection.stream()):
         return None
     
-    for num, doc in enumerate(collection.stream(), start=1):
+    for doc in experience_collection.stream():
+
         doc_dict = doc.to_dict()
         role = doc_dict.get("role", "")
         organization = doc_dict.get("organization", "")
-        title = f"{role} @ {organization}"
+        at_string = "@" if organization else ""
+        title = f"{role} {at_string} {organization}"
+        id_int = int(doc.id.split("_")[-1])
+
 
         # Call create_experience with the appropriate number
-        create_experience_ui(doc.id[-2], title)
+        create_experience_ui(id=id_int, existing_experience=True, title=title)
+
+    

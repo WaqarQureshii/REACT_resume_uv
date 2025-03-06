@@ -1,7 +1,7 @@
 [project]
 name = "react-resume-uv"
 version = "0.0.1"
-description = "Add your description here"
+description = "Setting up REACT skeleton that houses the database functions to read/write from Firebase, as well as creating the UI."
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
