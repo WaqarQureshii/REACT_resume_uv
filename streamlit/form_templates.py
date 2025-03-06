@@ -2,8 +2,6 @@ import streamlit as st
 
 from firebase_tools import upload_firebase_db, get_firestore_value, delete_firestore_document
 
-from datetime import date
-
 
 def contact_form() -> None:
     with st.form(key="contact_form", enter_to_submit=False, clear_on_submit=False):
@@ -70,7 +68,7 @@ def contact_form() -> None:
 
 def experience_form(id: int, existing_experience: bool) -> None:
     id = f"{id:02}"
-    document_dict = get_firestore_value("current_experience", f"experience_{id}")
+    document_dict = get_firestore_value("experience", f"experience_{id}")
     with st.form(f"experience_form_{id}"):
         row1 = st.columns([10,4,10])
         organization = row1[0].text_input(
@@ -153,7 +151,7 @@ def experience_form(id: int, existing_experience: bool) -> None:
         row8 = st.columns([1,1,10])
         submitted = row8[0].form_submit_button("Submit", type="primary")
         if submitted:
-            upload_firebase_db("current_experience",
+            upload_firebase_db("experience",
                                f"experience_{id}",
                                organization=organization,
                                present=present,
@@ -174,7 +172,7 @@ def experience_form(id: int, existing_experience: bool) -> None:
         if existing_experience:
             delete_option = row8[1].form_submit_button("Delete", type="secondary")
             if delete_option:
-                delete_firestore_document("current_experience", f"experience_{id}")
+                delete_firestore_document("experience", f"experience_{id}")
                 st.switch_page("content/4_your_content.py")
 
 def education_form(id: int, existing_education: bool) -> None:

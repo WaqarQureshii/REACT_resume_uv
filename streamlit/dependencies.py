@@ -41,16 +41,16 @@ def login_user():
     st.login()
 
 def get_number_of_existing_experiences() -> int:
-    collection = get_firestore_collection("current_experience")
+    collection = get_firestore_collection("experience")
     no_of_documents = collection.count().get()[0][0].value
 
     return int(no_of_documents)
 
-def generate_current_experience():
+def generate_experience():
     """
     Generate and display current experience entries from a Firestore collection.
 
-    This function retrieves documents from the "current_experience" Firestore collection
+    This function retrieves documents from the "experience" Firestore collection
     and creates an experience entry for each document using the `create_experience_ui` function.
     Each entry is displayed with its role and organization. If there are no documents in
     the collection, the function returns None.
@@ -58,7 +58,7 @@ def generate_current_experience():
     Returns:
         str: None if no documents are found, otherwise the function does not return a value.
     """
-    experience_collection = get_firestore_collection("current_experience")
+    experience_collection = get_firestore_collection("experience")
     if not any(experience_collection.stream()):
         return None
     
