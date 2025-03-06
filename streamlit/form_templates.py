@@ -1,11 +1,11 @@
 import streamlit as st
 
-from firebase_tools import upload_firebase_db, get_firestore_information
+from firebase_tools import upload_firebase_db, get_firestore_value, delete_firestore_document
 
 
 def contact_form() -> None:
     with st.form(key="contact_form", enter_to_submit=False, clear_on_submit=False):
-        document_dict = get_firestore_information("contact", "contact")
+        document_dict = get_firestore_value("contact", "contact")
         row1 = st.columns(2)
         firstname = row1[0].text_input('First Name',
                                         value = document_dict.get("first_name",None),
@@ -65,15 +65,10 @@ def contact_form() -> None:
                                 state=state,
                                 city=city)
 
-def experience_values(existing: bool, firestore_collection_name: str, firestore_document_name: str, firestore_field: str):
-    if existing:
-        return get_firestore_information(firestore_collection_name, firestore_document_name, firestore_field)
-    else:
-        return None
 
 def experience_form(id: int, existing_experience: bool) -> None:
     id = f"{id:02}"
-    document_dict = get_firestore_information("current_experience", f"experience_{id}")
+    document_dict = get_firestore_value("current_experience", f"experience_{id}")
     with st.form(f"experience_form_{id}"):
         row1 = st.columns([10,4,10])
         organization = row1[0].text_input(
@@ -151,7 +146,8 @@ def experience_form(id: int, existing_experience: bool) -> None:
                                                  key=f"experience5_{id}",
                                                  placeholder="Bullet Pointed Experience")
         
-        submitted = st.form_submit_button("Submit")
+        row8 = st.columns([1,1,10])
+        submitted = row8[0].form_submit_button("Submit", type="primary")
         if submitted:
             upload_firebase_db("current_experience",
                                f"experience_{id}",
@@ -161,5 +157,18 @@ def experience_form(id: int, existing_experience: bool) -> None:
                                start_date=start_date,
                                end_date=end_date,
                                location=location,
-                               experiencecategory1=experience_category1,
-                               experience_description=experience_textarea1)
+                               experience_category1=experience_category1,
+                               experience_description1=experience_textarea1,
+                               experience_category2=experience_category2,
+                               experience_description2=experience_textarea2,experience_category3=experience_category3,
+                               experience_description3=experience_textarea3,
+                               experience_category4=experience_category4,
+                               experience_description4=experience_textarea4,
+                               experience_category5=experience_category5,
+                               experience_description5=experience_textarea5)
+            
+        if existing_experience:
+            delete_option = row8[1].form_submit_button("Delete", type="secondary")
+            if delete_option:
+                delete_firestore_document("current_experience", f"experience_{id}")
+                st.switch_page("content/4_your_content.py")

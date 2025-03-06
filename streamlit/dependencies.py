@@ -1,14 +1,8 @@
 import streamlit as st
-from streamlit.user_info import UserInfoProxy
-import re
-import streamlit_authenticator as stauth
-from google.cloud import firestore
-
 
 from firebase_tools import get_user_db, get_firestore_collection
 from form_templates import experience_form
 
-import datetime
 from typing import Optional
 
 ### --- UI --- ###
@@ -61,21 +55,40 @@ def generate_current_experience():
         str: None if no documents are found, otherwise the function does not return a value.
     """
     experience_collection = get_firestore_collection("current_experience")
-    no_of_documents = experience_collection.count().get()[0][0].value
     if not any(experience_collection.stream()):
         return None
     
     for doc in experience_collection.stream():
 
         doc_dict = doc.to_dict()
+        
         role = doc_dict.get("role", "")
         organization = doc_dict.get("organization", "")
+        
         at_string = "@" if organization else ""
         title = f"{role} {at_string} {organization}"
+        
         id_int = int(doc.id.split("_")[-1])
 
-
-        # Call create_experience with the appropriate number
         create_experience_ui(id=id_int, existing_experience=True, title=title)
 
+def find_next_experience_id() -> int:
+    experience_collection = get_firestore_collection("current_experience")
+    # Fetch all document IDs from the collection
+    doc_ids = [int(doc.id.split("_")[-1]) for doc in experience_collection.stream()]
+
+    print(doc_ids)
     
+    if not doc_ids:
+        return 1
+    
+    # Sort the IDs to check for gaps
+    doc_ids.sort()
+    
+    # Find the first missing ID
+    for idx, doc_id in enumerate(doc_ids, start=1):
+        if doc_id != idx:
+            return idx  # Return the first missing ID
+    
+    # If no gaps, return the next largest ID
+    return doc_ids[-1] + 1

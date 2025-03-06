@@ -59,7 +59,7 @@ def upload_firebase_db(firestore_collection_name: str, firestore_document_name:s
     document = db.collection(firestore_collection_name).document(firestore_document_name)
     document.set(fields)
 
-def get_firestore_information(firestore_collection_name: str, firestore_document_name: str) -> dict:
+def get_firestore_value(firestore_collection_name: str, firestore_document_name: str) -> dict:
     """Get information from the collection(users).document(email)"""
     db = get_user_db()
     document = db.collection(firestore_collection_name).document(firestore_document_name)
@@ -88,5 +88,11 @@ def get_firestore_collection(firestore_collection: str) -> CollectionReference:
     collection = db.collection(firestore_collection)
     return collection
 
+
 def create_firestore_document(db: firestore.DocumentReference, firestore_collection_name: str, firestore_document_name: str):
     firestore_collection_name = db.collection("current_experience").document(firestore_document_name).set({})
+
+
+def delete_firestore_document(firestore_collection_name: str, firestore_document_name: str) -> None:
+    db = get_user_db()
+    db.collection(firestore_collection_name).document(firestore_document_name).delete()
