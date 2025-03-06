@@ -89,8 +89,9 @@ def get_firestore_collection(firestore_collection: str) -> CollectionReference:
     return collection
 
 
-def create_firestore_document(db: firestore.DocumentReference, firestore_collection_name: str, firestore_document_name: str):
-    firestore_collection_name = db.collection("current_experience").document(firestore_document_name).set({})
+def create_firestore_document(firestore_collection_name: str, firestore_document_name: str):
+    db = get_user_db()
+    firestore_collection_name = db.collection(firestore_collection_name).document(firestore_document_name).set({})
 
 
 def delete_firestore_document(firestore_collection_name: str, firestore_document_name: str) -> None:

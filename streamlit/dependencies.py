@@ -1,7 +1,7 @@
 import streamlit as st
 
 from firebase_tools import get_user_db, get_firestore_collection
-from form_templates import experience_form
+from form_templates import experience_form, education_form
 
 from typing import Optional
 
@@ -30,6 +30,10 @@ def sidebar_account():
 def create_experience_ui(id: int, existing_experience: bool, title: Optional[str]=""):
     with st.expander(f"Experience #{f"{id:02}"} {title}"):
         experience_form(id, existing_experience)
+
+def create_education_ui(id: int, existing_education: bool, title: Optional[str]=""):
+    with st.expander(f"Education #{f"{id:02}"} {title}"):
+        education_form(id, existing_education)
 
 ### --- Global Functions --- ###
 
@@ -72,13 +76,11 @@ def generate_current_experience():
 
         create_experience_ui(id=id_int, existing_experience=True, title=title)
 
-def find_next_experience_id() -> int:
-    experience_collection = get_firestore_collection("current_experience")
+def find_next_id(collection_name: str) -> int:
+    collection = get_firestore_collection(collection_name)
     # Fetch all document IDs from the collection
-    doc_ids = [int(doc.id.split("_")[-1]) for doc in experience_collection.stream()]
+    doc_ids = [int(doc.id.split("_")[-1]) for doc in collection.stream()]
 
-    print(doc_ids)
-    
     if not doc_ids:
         return 1
     
@@ -92,3 +94,32 @@ def find_next_experience_id() -> int:
     
     # If no gaps, return the next largest ID
     return doc_ids[-1] + 1
+
+def generate_education():
+    """
+    Generate and display education entries from a Firestore collection.
+
+    This function retrieves documents from the "education" Firestore collection
+    and creates an experience entry for each document using the `create_education_ui` function.
+    If there are no documents in the collection, the function returns None.
+
+    Returns:
+        str: None if no documents are found, otherwise the function does not return a value.
+    """
+    education_collection = get_firestore_collection("education")
+    if not any(education_collection.stream()):
+        return None
+    
+    for doc in education_collection.stream():
+
+        doc_dict = doc.to_dict()
+        
+        degree = doc_dict.get("degree", "")
+        institution = doc_dict.get("institution", "")
+        
+        at_string = "@" if institution else ""
+        title = f"{degree} {at_string} {institution}"
+        
+        id_int = int(doc.id.split("_")[-1])
+
+        create_education_ui(id=id_int, existing_education=True, title=title)

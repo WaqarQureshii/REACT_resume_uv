@@ -2,6 +2,8 @@ import streamlit as st
 
 from firebase_tools import upload_firebase_db, get_firestore_value, delete_firestore_document
 
+from datetime import date
+
 
 def contact_form() -> None:
     with st.form(key="contact_form", enter_to_submit=False, clear_on_submit=False):
@@ -84,13 +86,15 @@ def experience_form(id: int, existing_experience: bool) -> None:
                                   key=f"role_{id}")
 
         row2 = st.columns([1,1,3])
-        start_date = row2[0].date_input("Start Date",
+        start_date = row2[0].text_input("Start Date",
                                         value = document_dict.get("start_date",None),
-                                        key=f"start_date_{id}")
+                                        key=f"start_date_{id}",
+                                        placeholder="YYYY/MM")
         if not present:
-            end_date = row2[1].date_input("End Date",
+            end_date = row2[1].text_input("End Date",
                                           value = document_dict.get("end_date",None),
-                                          key=f"end_date_{id}")
+                                          key=f"end_date_{id}",
+                                          placeholder="YYYY/MM")
         location = row2[2].text_input("Location",
                                       value = document_dict.get("location",None),
                                       placeholder="Toronto, Canada",
@@ -171,4 +175,83 @@ def experience_form(id: int, existing_experience: bool) -> None:
             delete_option = row8[1].form_submit_button("Delete", type="secondary")
             if delete_option:
                 delete_firestore_document("current_experience", f"experience_{id}")
+                st.switch_page("content/4_your_content.py")
+
+def education_form(id: int, existing_education: bool) -> None:
+    id = f"{id:02}"
+    document_dict = get_firestore_value("education", f"education_{id}")
+    with st.form(f"education_{id}"):
+        row1 = st.columns(2)
+        degree = row1[0].text_input(
+            "Degree, Diploma, Certificate Name",
+            value=document_dict.get("degree", None),
+            placeholder="B. Comm: Economics Major",
+            key=f"degree_{id}"
+        )
+        institution = row1[1].text_input(
+            "Institution Name?",
+            value = document_dict.get("institution", None),
+            placeholder="Queens University",
+            key=f"institution_{id}"
+        )
+
+        row2=st.columns(2)
+        location = row2[0].text_input(
+            "Location",
+            value=document_dict.get("location", None),
+            placeholder="Kingston, ON, Canada",
+            key=f"location_{id}"
+        )
+        year_earned = row2[1].text_input("Year qualification was earned in",
+                                         value=document_dict.get("year_earned", None),
+                                         placeholder="YYYY",
+                                         key=f"year_earned_{id}"
+                                         )
+        
+        row3=st.columns(3)
+        specialist = row3[0].text_input("Specialization",
+                                        value=document_dict.get("specialist", None),
+                                        placeholder="Accounting Specialist",
+                                        key=f"specialist_{id}"
+                                        )
+        major = row3[1].text_input("Major",
+                                   value=document_dict.get("major",None),
+                                   placeholder="Economics Major",
+                                   key=f"major_{id}")
+        minor = row3[2].text_input("Minor",
+                                   value=document_dict.get("minor", None),
+                                   placeholder="English Minor",
+                                   key=f"minor_{id}"
+                                   )
+        
+        row4=st.columns([1,5])
+        gpa = row4[0].text_input("GPA (if applicable)",
+                                 value=document_dict.get("gpa", None),
+                                 placeholder="3.9",
+                                 key=f"gpa_{id}"
+                                 )
+        additional_info = row4[1].text_input("Additional Information",
+                                             value=document_dict.get("additional_info", None),
+                                             placeholder="Graduated with Distinction",
+                                             key=f"additional_info_{id}")
+        
+        row5 = st.columns([1,1,10])
+        submitted = row5[0].form_submit_button("Submit", type="primary")
+        if submitted:
+            upload_firebase_db("education",
+                               f"education_{id}",
+                               degree=degree,
+                               institution=institution,
+                               location=location,
+                               year_earned=year_earned,
+                               specialist=specialist,
+                               major=major,
+                               minor=minor,
+                               gpa=gpa,
+                               additional_info=additional_info)
+            
+        if existing_education:
+            delete_option = row5[1].form_submit_button("Delete", type="secondary")
+            if delete_option:
+                delete_firestore_document("education", f"education_{id}")
                 st.switch_page("content/4_your_content.py")
