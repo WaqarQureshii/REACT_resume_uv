@@ -10,3 +10,4 @@ wheels/
 .venv
 .qodo
 .streamlit
+.ruff_cache
