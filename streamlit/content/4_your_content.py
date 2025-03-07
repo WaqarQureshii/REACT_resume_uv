@@ -1,6 +1,6 @@
 import streamlit as st
 
-from dependencies import login_user, generate_experience, find_next_id, generate_education
+from dependencies import login_user, generate_experience, find_next_id, generate_education, generate_summary
 from form_templates import contact_form
 from firebase_tools import create_firestore_document, upload_firebase_db
 
@@ -14,7 +14,7 @@ else:
 
     col1.text("Your Resume Content")
 
-    contact_tab, experience_tab, education_tab = col2.tabs(["Contact", "Professional Experience", "Education"])
+    contact_tab, experience_tab, education_tab, skill_tab = col2.tabs(["Contact", "Professional Experience", "Education", "Professional Summary"])
 
     with contact_tab:
         contact_form()
@@ -49,3 +49,16 @@ else:
                                )
         generate_education()
 
+    with skill_tab:
+        if st.button("Add Professional Summary", key = "add_skill_button"):
+            id = find_next_id("summary")
+
+            document_title = f"career_summary_{id:02}"
+
+            create_firestore_document("summary", document_title)
+            upload_firebase_db("summary",
+                               document_title,
+                               skill="",
+                               description="")
+        
+        generate_summary()

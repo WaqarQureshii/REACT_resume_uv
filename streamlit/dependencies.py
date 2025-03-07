@@ -1,7 +1,7 @@
 import streamlit as st
 
 from firebase_tools import get_user_db, get_firestore_collection
-from form_templates import experience_form, education_form
+from form_templates import experience_form, education_form, summary_form
 
 from typing import Optional
 
@@ -34,6 +34,12 @@ def create_experience_ui(id: int, existing_experience: bool, title: Optional[str
 def create_education_ui(id: int, existing_education: bool, title: Optional[str]=""):
     with st.expander(f"Education #{f"{id:02}"} {title}"):
         education_form(id, existing_education)
+
+
+def create_summary_ui(id: int, existing_summary: bool, title: Optional[str]=""):
+    with st.expander(f"{title} summary #{id}"):
+        summary_form(id, existing_summary)
+
 
 ### --- Global Functions --- ###
 
@@ -95,6 +101,7 @@ def find_next_id(collection_name: str) -> int:
     # If no gaps, return the next largest ID
     return doc_ids[-1] + 1
 
+
 def generate_education():
     """
     Generate and display education entries from a Firestore collection.
@@ -123,3 +130,31 @@ def generate_education():
         id_int = int(doc.id.split("_")[-1])
 
         create_education_ui(id=id_int, existing_education=True, title=title)
+
+
+def generate_summary():
+    """
+    Generate and display summary entries from a Firestore collection.
+
+    This function retrieves documents from the "summary" Firestore collection
+    and creates an experience entry for each document using the `create_summary_ui` function.
+    If there are no documents in the collection, the function returns None.
+
+    Returns:
+        str: None if no documents are found, otherwise the function does not return a value.
+    """
+    summary_collection = get_firestore_collection("summary")
+    if not any(summary_collection.stream()):
+        return None
+    
+    for doc in summary_collection.stream():
+
+        doc_dict = doc.to_dict()
+
+        skill = doc_dict.get("skill", "")
+        summary = doc_dict.get("description")
+
+        title = f"{skill}"
+        id_int = int(doc.id.split("_")[-1])
+
+        create_summary_ui(id=id_int, existing_summary = True, title=title)

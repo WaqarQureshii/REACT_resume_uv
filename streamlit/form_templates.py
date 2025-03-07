@@ -93,10 +93,13 @@ def experience_form(id: int, existing_experience: bool) -> None:
                                           value = document_dict.get("end_date",None),
                                           key=f"end_date_{id}",
                                           placeholder="YYYY/MM")
+        else:
+            end_date = None
+            
         location = row2[2].text_input("Location",
                                       value = document_dict.get("location",None),
                                       placeholder="Toronto, Canada",
-                                      key=f"location_{id}")
+                                      key=f"job_location_{id}")
         
         row3 = st.columns([4,10])
         experience_category1 = row3[0].text_area("Category",
@@ -104,7 +107,7 @@ def experience_form(id: int, existing_experience: bool) -> None:
                                                  key=f"experience_category1_{id}",
                                                  placeholder="separate by commas")
         experience_textarea1 = row3[1].text_area("Experience",
-                                                 value = document_dict.get("experience_textarea1",None),
+                                                 value = document_dict.get("experience_description1",None),
                                                  key=f"experience1_{id}",
                                                  placeholder="Bullet Pointed Experience")
 
@@ -114,7 +117,7 @@ def experience_form(id: int, existing_experience: bool) -> None:
                                                  key=f"experience_category2_{id}",
                                                  placeholder="separate by commas")
         experience_textarea2 = row4[1].text_area("Experience",
-                                                 value=document_dict.get("experience_textarea2",None),
+                                                 value=document_dict.get("experience_description2",None),
                                                  key=f"experience2_{id}",
                                                  placeholder="Bullet Pointed Experience")
 
@@ -124,7 +127,7 @@ def experience_form(id: int, existing_experience: bool) -> None:
                                                  key=f"experience_category3_{id}",
                                                  placeholder="separate by commas")
         experience_textarea3 = row5[1].text_area("Experience",
-                                                 value=document_dict.get("experience_textarea3",None),
+                                                 value=document_dict.get("experience_description3",None),
                                                  key=f"experience3_{id}",
                                                  placeholder="Bullet Pointed Experience")
 
@@ -134,7 +137,7 @@ def experience_form(id: int, existing_experience: bool) -> None:
                                                  key=f"experience_category4_{id}",
                                                  placeholder="separate by commas")
         experience_textarea4 = row6[1].text_area("Experience",
-                                                 value=document_dict.get("experience_textarea4",None),
+                                                 value=document_dict.get("experience_description4",None),
                                                  key=f"experience4_{id}",
                                                  placeholder="Bullet Pointed Experience")
 
@@ -144,7 +147,7 @@ def experience_form(id: int, existing_experience: bool) -> None:
                                                  key=f"experience_category5_{id}",
                                                  placeholder="separate by commas")
         experience_textarea5 = row7[1].text_area("Experience",
-                                                 value=document_dict.get("experience_textarea5",None),
+                                                 value=document_dict.get("experience_description5",None),
                                                  key=f"experience5_{id}",
                                                  placeholder="Bullet Pointed Experience")
         
@@ -175,6 +178,7 @@ def experience_form(id: int, existing_experience: bool) -> None:
                 delete_firestore_document("experience", f"experience_{id}")
                 st.switch_page("content/4_your_content.py")
 
+
 def education_form(id: int, existing_education: bool) -> None:
     id = f"{id:02}"
     document_dict = get_firestore_value("education", f"education_{id}")
@@ -198,7 +202,7 @@ def education_form(id: int, existing_education: bool) -> None:
             "Location",
             value=document_dict.get("location", None),
             placeholder="Kingston, ON, Canada",
-            key=f"location_{id}"
+            key=f"education_location_{id}"
         )
         year_earned = row2[1].text_input("Year qualification was earned in",
                                          value=document_dict.get("year_earned", None),
@@ -252,4 +256,33 @@ def education_form(id: int, existing_education: bool) -> None:
             delete_option = row5[1].form_submit_button("Delete", type="secondary")
             if delete_option:
                 delete_firestore_document("education", f"education_{id}")
+                st.switch_page("content/4_your_content.py")
+
+
+def summary_form(id: int, existing_summary: bool) -> None:
+    id = f"{id:02}"
+    document_dict = get_firestore_value("summary", f"career_summary_{id}")
+    with st.form(f"career_summary_form_{id}"):
+        row1 = st.columns([4,10])
+        summary_category1 = row1[0].text_area("Professional Skill/Achievement",
+                                              value=document_dict.get("skill", None),
+                                              key=f"skill_{id}",
+                                              placeholder="Financial and Product Management")
+        summary_1 = row1[1].text_area("Description",
+                                      value=document_dict.get("description", None),
+                                      key=f"summary_{id}",
+                                      placeholder="7+ years managing full-cycle financial budgeting of over $100M+, forecasting significant risks and opportunities within the market, and assessing headcount resources for a 5,000+ headcount organization. 3+ years with a minimum of 3 direct reports owning various business unit portfolios.")
+        
+        row2 = st.columns([1,1,10])
+        submitted = row2[0].form_submit_button("Submit", type = "primary")
+        if submitted:
+            upload_firebase_db("summary",
+                               f"career_summary_{id}",
+                               skill=summary_category1,
+                               description=summary_1)
+        
+        if existing_summary:
+            delete_option = row2[1].form_submit_button("Delete", type="secondary")
+            if delete_option:
+                delete_firestore_document("summary", f"career_summary_{id}")
                 st.switch_page("content/4_your_content.py")
