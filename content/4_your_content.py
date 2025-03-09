@@ -1,8 +1,8 @@
 import streamlit as st
 
-from dependencies import login_user, generate_experience, find_next_id, generate_education, generate_summary
+from tools_general import login_user, generate_experience, find_next_id, generate_education, generate_summary
 from form_templates import contact_form
-from firebase_tools import create_firestore_document, upload_firebase_db
+from tools_firebase import create_firestore_document, upload_firebase_db
 
 
 if not st.experimental_user.is_logged_in:

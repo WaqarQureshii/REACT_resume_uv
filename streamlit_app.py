@@ -1,6 +1,6 @@
 import streamlit as st
 
-from dependencies import sidebar_account
+from tools_general import sidebar_account
 
 st.set_page_config(layout="wide")
 
