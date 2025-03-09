@@ -1,0 +1,4 @@
+authlib==1.5.0
+firebase-admin==6.6.0
+google-cloud-firestore==2.20.0
+streamlit==1.42.0

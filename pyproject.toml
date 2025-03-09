@@ -9,5 +9,4 @@ dependencies = [
     "firebase-admin>=6.6.0",
     "google-cloud-firestore>=2.20.0",
     "streamlit>=1.42.0",
-    "streamlit-authenticator>=0.4.1",
 ]
