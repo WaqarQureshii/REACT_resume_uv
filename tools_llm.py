@@ -3,133 +3,448 @@ import streamlit as st
 from langchain_openai import ChatOpenAI
 from langchain_google_genai import ChatGoogleGenerativeAI
 
-from tools_firebase import get_user_db
+from tools_firebase import get_firestore_collection, get_user_db
+from prompts import prompts
 
 def get_resume_formatted_for_llm(collection_type: str) -> str:
-    user_db = get_user_db()
-    collections = user_db.collection(collection_type)
+    Candidate_db = get_user_db()
+    collections = Candidate_db.collection(collection_type)
 
     result = []
 
     for doc in collections.stream():
         data=doc.to_dict()
         
-        # Retrieve the job name and other fields
-        job_title = data.get("role", "UNKNOWN ROLE")
-        company = data.get("organization", "UNKNOWN ORGANIZATION")
-        start_date = data.get("start_date", "YYYY-MM")
-        if data.get("present"):
-            end_date = "Present"
-        else:
-            end_date = data.get("end_date", "YYYY-MM")
+        if collection_type=="experience":
+            # Retrieve the job name and other fields
+            job_title = data.get("role", "UNKNOWN ROLE")
+            company = data.get("organization", "UNKNOWN ORGANIZATION")
+            start_date = data.get("start_date", "YYYY-MM")
+            job_linkedin_url = data.get("linkedin_url", "None")
+            if data.get("present"):
+                end_date = "Present"
+            else:
+                end_date = data.get("end_date", "YYYY-MM")
 
-        location = data.get("location", "UNKNOWN LOCATION")
+            work_location = data.get("location", "UNKNOWN LOCATION")
 
-        experiences = [
-            value for key, value in data.items()
-            if key.startswith("experience_description") and value
-        ]
+            experiences = [
+                value for key, value in data.items()
+                if key.startswith("experience_description") and value
+            ]
 
-        result.append(f"Title: {job_title}\n")
-        result.append(f"Company: {company}\n")
-        result.append(f"Start Date: {start_date}\n")
-        result.append(f"End Date: {end_date}\n")
-        result.append(f"Location: {location}\n")
-        for experience in experiences:
-            result.append(f"- {experience}")
+            result.append(f"Title: {job_title}\n")
+            result.append(f"Company: {company}\n")
+            result.append(f"LinkedIN URL: {job_linkedin_url}\n")
+            result.append(f"Start Date: {start_date}\n")
+            result.append(f"End Date: {end_date}\n")
+            result.append(f"Location: {work_location}\n")
+            for experience in experiences:
+                result.append(f"- {experience}")
+
+        if collection_type == "summary":
+            skill = data.get("skill", "Unknown Skill")
+            skill_summary = data.get("description", "Unknown description")
+
+            result.append(f"Skill: {skill}")
+            result.append(skill_summary)
+
+        if collection_type == "education":
+            institution = data.get("institution", "Unknown institution")
+            degree = data.get("degree", "Unknown degree")
+            education_url = data.get("website_url", "None")
+            specialist = data.get("specialist", "Unknown")
+            major = data.get("major", "Unknown")
+            minor = data.get("minor", "Unknown")
+            education_location = data.get("location", "Unknown")
+            year_earned = data.get("year_earned", "Unknown")
+            gpa = data.get("gpa", "Unknown")
+            additional_info = data.get("additional_info", "Unknown")
+
+            result.append(f"Institution: {institution}")
+            result.append(f"Degree: {degree}, Specialist: {specialist}, Major: {major}, Minor: {minor}")
+            result.append(f"Website URL: {education_url}\n")
+            result.append(f"Location: {education_location}")
+            result.append(f"Year Earned: {year_earned}")
+            result.append(f"Additional Info: {additional_info}")
+
+        if collection_type == "contact":
+            email_address = data.get("email_address", None)
+            first_name = data.get("first_name", None)
+            last_name = data.get("last_name", None)
+            contact_linkedin_url = data.get("linkedin_url", None)
+            phone_number = data.get("phone_number", None)
+            personal_website = data.get("personal_website", None)
+
+            result.append(f"Email Address: {email_address}")
+            result.append(f"Name: {first_name} {last_name}")
+            result.append(f"LinkedIN URL: {contact_linkedin_url}")
+            result.append(f"Phone Number: {phone_number}")
+            result.append(f"personal_website: {personal_website}")
+
 
     return "\n".join(result)
                 
+latex_resume_header = r'''
+\begin{center}
+    \textbf{\LARGE [Your Name, Your Designation]} \\
+    \smallskip
+    [Your Professional Tagline or Focus Area] \\
+    \faLinkedinSquare \ \href{https://www.linkedin.com/in/username/}{linkedin.com/in/yourprofile} \quad \faEnvelope \ \href{mailto:your.email@example.com}{your.email@example.com} \quad \faPhone \ ([Your Phone Number])
+\end{center}'''
 
-job_experiences_system_prompt = '''
-Extract key information from a job posting and use it to revise or generate strong, quantifiable bullet points for a person's job experience section in their resume.
+latex_working_experience = r'''
+\section{Experience}
+  \resumeSubHeadingListStart
 
-When a person's job experience lacks details, generate viable situation-task-action-result bullet points based on the job description and typical responsibilities for the relevant job title. Please make it Applicant Tracking System-friendly.
+    \resumeSubheading
+      {[Job Title 1]}{[Start Date] -- [End Date or Present]}
+      {\href{https://www.linkedin.com/company/companyname/}{[Company Name]}}{[Location]}
+      \resumeItemListStart
+        \resumeItem{Bullet Point about Job Title 1}
+        \resumeItem{Bullet Point about Job Title 1}
+        \resumeItem{Bullet Point about Job Title 1}
+      \resumeItemListEnd
 
-# Steps
+    \resumeSubheading
+      {[Job Title 2]}{[Start Date] -- [End Date]}
+      {\href{https://www.linkedin.com/company/companyname/}{[Company Name]}}{[Location]}
+      \resumeItemListStart
+        \resumeItem{Bullet Point about Job Title 2}
+        \resumeItem{Bullet Point about Job Title 2}
+        \resumeItem{Bullet Point about Job Title 2}
+      \resumeItemListEnd
 
-1. **Job Posting Analysis**: Extract all key skills, responsibilities, and qualifications relevant to the job from the given job description.
-    - Please check again to see if you missed any points.
-2. **Job Experience Review**: For each job experience provided (from most to least recent), analyze existing bullet points:
-   - Identify the specific action taken.
-   - Identify the scenario and context of the action.
-   - Determine the quantifiable result as the outcome.
-3. **Create Bullet Points*: Be prepared to create some from scratch if you don't have enough information from step 2. Using the Job Experience Review and Job Description Analysis create bullet points that:
-   - Have depth by ensuring it has multiple key action verbs or skillsets that are related to the job description.
-   - Explicitly state the actions taken by the person - be detailed in terms of mentioning who was involved, what skills it involved, the impact it had, the issue at hand etc.
-   - Detail the quantifiable result using metrics or outcomes related to the job description - please use numeric values such as percentages of efficency gained/time saved/accuracy, $ impact of savings/budget/materiality. Don't limit yourself to those only.
-   - Add context around the results and action.
-   - Try to make them 2-3 lines-worth of content.
-4. **Bullet Point Generation**: If a job experience contains minimal information:
-   - Create viable action-result statements aligned with the key responsibilities and skills extracted from the job description.
-   - Ensure these generated points are realistic for the given job title and industry.
-   - Try to end up with 4-5 bullet points even if you have to generate some from scratch.
-   - Have the creativity freedom to join two existing experiences into one if it creates consistent bullet point sizing without losing resume strength.
-5. **Revising each bullet point**: Please check again to ensure that each bullet point meets Step 2's requirement while staying Applicant Tracking System friendly.
-6. **Sort revised bullet points in the order of importance**: Sort the bullet points by what you deem to be critical based on the job description and what is deemed most important.
-
-# Output Format
-
-Provide key skillsets or experiences you deemed were important in step 1 before sending the revised bullet points over.
-
-Provide a list of revised or new bullet points for each job experience. Bullet points should:
-- Begin with a strong action verb.
-- Include either multiple actions or skillsets involved.
-- Try to make them 2-3 lines-worth of content.
-- Add context to the situation to add depth to the bullet point.
-- Include specific actions.
-Include quantifiable outcomes such as percentage impact, dollar impact, headcount impact, number of rows automated, number of systems integrated etc
-- Include specific actions that got the result.
-- Be clear and concise.
-
-# Examples
-
-**Input Job Description**:
-- Skills: Project management, team leadership managing multiple teams, budget oversight.
-- Responsibilities: Coordinate cross-functional teams, manage project timelines, ensure resource allocation.
-
-**Input Job Experience**:
-- Title: Project Manager
-- Company: XYZ Corp
-- Dates: Jan 2020 - Present
-- Existing Bullet: "Managed projects."
-
-**Output**:
-Key Skillsets from the job description:
-Project Management skills, cross-functional leadership, managing budgets.
-
-Here are the revised bullet points:
-- Provide financial advisory services to business leaders across the organization while coordinating work portfolios among FP&A analysts. Connecting FP&A analysts with business leaders to prepare enterprise long-range planning models, quarterly and monthly internal reporting including variance analysis for executives, Translink reporting and other ad-hoc projects.
-- Finance business partner to the Vice President of Engineering, partnering with 2 Senior Directors and 21 managers / staff to manage over $50 million through the development of actionable category level strategies, providing financial insight, market analysis and management of business plans - instrumental in reaching 97% forecast KPI metrics.
-
-# Notes
-- Ensure that each generated bullet point aligns with typical responsibilities for the given job role and industry.
-- If possible, maintain a consistent style and format throughout the resume for professionalism.
+  \resumeSubHeadingListEnd
+'''
+latex_professional_summary =r'''
+\section{Professional Summary}
+  \resumeItemListStart
+    \resumeItem{Bullet Point about Professional Summary 1}
+    \resumeItem{Bullet Point about Professional Summary 2}
+    \resumeItem{Bullet Point about Professional Summary 3}
+  \resumeItemListEnd
 '''
 
-def get_openai_response(llm_selection: str, model_selection: str, job_description: str):
-    messages = [
-        SystemMessage(
-            content=job_experiences_system_prompt
-        ),
-        AIMessage(
-            content="Okay, please send over the job description first."
-        ),
-        HumanMessage(
-            content=job_description
-        ),
-        AIMessage(
-            content="Thank you, I will include the main skillsets and experiences I think are required for the job before my revised resume. I will do this after you send your job experiences."
-        ),
-        HumanMessage(
-            content=get_resume_formatted_for_llm("experience")
-        )
-    ]   
+latex_education = r'''
+\section{Education}
+  \resumeSubHeadingListStart
+    \resumeSubheading
+      {\href{https://www.college.com/degree}{[Degree, Field of Study]}}{[Graduation Year]}
+      {[University Name]}{[Location]}
+    \resumeSubheading
+      {\href{https://www.college.com/degree}{[Certificate Name]}}{[Graduation Year]}
+      {[University Name]}{[Location]}
+  \resumeSubHeadingListEnd
+'''
+
+latex_summary_skills = r'''
+\section{Skills}
+  \resumeItemListStart
+    \resumeItem{Bullet Point about Skills 1}
+    \resumeItem{Bullet Point about Skills 2}
+    \resumeItem{Bullet Point about Skills 3}
+  \resumeItemListEnd
+'''
+latex_jakes_resume = r'''% FORMATTING START
+\documentclass[letterpaper,12pt]{article}
+
+\usepackage{latexsym}
+\usepackage[empty]{fullpage}
+\usepackage{titlesec}
+\usepackage{marvosym}
+\usepackage[usenames,dvipsnames]{color}
+\usepackage{verbatim}
+\usepackage{enumitem}
+\usepackage[hidelinks]{hyperref}
+\usepackage{fancyhdr}
+\usepackage[english]{babel}
+\usepackage{tabularx}
+\input{glyphtounicode}
+\usepackage{fontawesome}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyfoot{}
+\renewcommand{\headrulewidth}{0pt}
+\renewcommand{\footrulewidth}{0pt}
+
+\addtolength{\oddsidemargin}{-0.6in}
+\addtolength{\evensidemargin}{-0.6in}
+\addtolength{\textwidth}{1in}
+\addtolength{\topmargin}{-.6in}
+\addtolength{\textheight}{0.2in}
+\addtolength{\textheight}{-0.01in}
+
+\urlstyle{same}
+
+\raggedbottom
+\raggedright
+\setlength{\tabcolsep}{0in}
+
+\titleformat{\section}{
+  \vspace{-4pt}\scshape\raggedright\large
+}{}{0em}{}[\color{black}\titlerule \vspace{-8pt}]
+
+\pdfgentounicode=1
+
+\newcommand{\resumeItem}[1]{
+  \item\small{
+    {#1 \vspace{-2pt}}
+  }
+}
+
+\newcommand{\resumeSubheading}[4]{
+  \vspace{4pt}\item
+    \begin{tabular*}{0.97\textwidth}[t]{l@{\extracolsep{\fill}}r}
+      \textbf{#1} & #2 \\
+      \textit{\small#3} & \textit{\small #4} \\
+    \end{tabular*}\vspace{-5pt}
+}
+
+\newcommand{\resumeSubSubheading}[2]{
+    \item
+    \begin{tabular*}{0.97\textwidth}{l@{\extracolsep{\fill}}r}
+      \textit{\small#1} & \textit{\small #2} \\
+    \end{tabular*}\vspace{-7pt}
+}
+
+\newcommand{\resumeProjectHeading}[2]{
+    \item
+    \begin{tabular*}{0.97\textwidth}{l@{\extracolsep{\fill}}r}
+      \small#1 & #2 \\
+    \end{tabular*}\vspace{-7pt}
+}
+
+\newcommand{\resumeSubItem}[1]{\resumeItem{#1}\vspace{-4pt}}
+
+\renewcommand\labelitemii{$\vcenter{\hbox{\tiny$\bullet$}}$}
+
+\newcommand{\resumeSubHeadingListStart}{\begin{itemize}[leftmargin=0.07in, label={}]}
+\newcommand{\resumeSubHeadingListEnd}{\end{itemize}}
+\newcommand{\resumeItemListStart}{\begin{itemize}}
+\newcommand{\resumeItemListEnd}{\end{itemize}\vspace{-5pt}}
+
+\begin{document}
+
+% FORMATTING END
+
+% RESUME START
+% Header
+\begin{center}
+    \textbf{\LARGE [Your Name, Your Designation]} \\
+    \smallskip
+    [Your Professional Tagline or Focus Area] \\
+    \faLinkedinSquare \ \href{https://www.linkedin.com/in/username/}{linkedin.com/in/yourprofile} \quad \faEnvelope \ \href{mailto:your.email@example.com}{your.email@example.com} \quad \faPhone \ ([Your Phone Number])
+\end{center}
+
+\section{Professional Summary}
+  \resumeItemListStart
+    \resumeItem{Bullet Point about Professional Summary 1}
+    \resumeItem{Bullet Point about Professional Summary 2}
+    \resumeItem{Bullet Point about Professional Summary 3}
+  \resumeItemListEnd
+
+\section{Experience}
+  \resumeSubHeadingListStart
+
+    \resumeSubheading
+      {[Job Title 1]}{[Start Date] -- [End Date or Present]}
+      {\href{https://www.linkedin.com/company/companyname/}{[Company Name]}}{[Location]}
+      \resumeItemListStart
+        \resumeItem{Bullet Point about Job Title 1}
+        \resumeItem{Bullet Point about Job Title 1}
+        \resumeItem{Bullet Point about Job Title 1}
+      \resumeItemListEnd
+
+    \resumeSubheading
+      {[Job Title 2]}{[Start Date] -- [End Date]}
+      {\href{https://www.linkedin.com/company/companyname/}{[Company Name]}}{[Location]}
+      \resumeItemListStart
+        \resumeItem{Bullet Point about Job Title 2}
+        \resumeItem{Bullet Point about Job Title 2}
+        \resumeItem{Bullet Point about Job Title 2}
+      \resumeItemListEnd
+
+  \resumeSubHeadingListEnd
+
+\section{Education}
+  \resumeSubHeadingListStart
+    \resumeSubheading
+      {\href{https://www.college.com/degree}{[Degree, Field of Study]}}{[Graduation Year]}
+      {[University Name]}{[Location]}
+    \resumeSubheading
+      {\href{https://www.college.com/degree}{[Certificate Name]}}{[Graduation Year]}
+      {[University Name]}{[Location]}
+  \resumeSubHeadingListEnd
+
+
+\section{Skills}
+  \resumeItemListStart
+    \resumeItem{Bullet Point about Skills 1}
+    \resumeItem{Bullet Point about Skills 2}
+    \resumeItem{Bullet Point about Skills 3}
+  \resumeItemListEnd
+
+\end{document}
+'''
+
+latex_options ={
+    "jakes_resume": latex_jakes_resume
+}
+
+
+_4_template_input = f'''You be a professional LaTeX editor by taking given LaTeX snippets of code and replacing the information in it with information I provide to you keeping the same format. Here is what you will be provided after:
+  1. Candidate contact information and the appropriate LaTeX snippet.
+  2. Candidate Professional Summary and the appropriate LaTeX snippet
+  3. Candidate Work Experience and the appropriate LaTeX snippet
+  4. Candidate Education and the appropriate LaTeX snippet
+  5. Candidate Summary of Skills and the appropriate LaTeX snippet
+  6. Generated Candidate Career Taglines and the appropriate LaTeX snippet
+
+# Steps
+  1. **Update the Contact header information**
+    - Utilizing the contact information provided and any links, you will add in and replace all contact information with the Candidate's.
+    - Update and/or add any links that were provided and find a way to add it in to the Candidate's resume in a professional way (perhaps in the name or label)
+  2. **Update the Career Taglines at the top of the resume**
+    - Update the Career Taglines with the ones provided. If none, suggest some based on the Candidate's work experience.
+  3. **Update the Professional Summary section with the one provided**
+    - Feel free to add/remove bullet points in the LaTeX resume to fit the professional summary in.
+  4. **Update all experiences from most recent to oldest order**
+    - Input all of the candidate's work organization's information such as Name, website hyperlink in the name, job title, period candidate worked there.
+  5. **Update the Education section based on the information provided to you**
+    - feel free to add or remove educations in the template to fit however many educations the Candidate has.
+    - Include any relevant links provided to you.
+  6. **Update the summary of skills section**
+    - Try to keep the Summary of Skills section in the same format provided to you and input it into the template.
+
+# Notes
+  - Keep the formatting the same as the LaTeX template provided to you.
+  - Only update the content including adding or removing nubmer of items in a list to fit the candidate's information.
+
+# Output format
+  **Header information**
+  LaTeX Code
+
+  **Career Taglines**
+  LaTeX code with Career Taglines
+
+  **Professional Summary**
+  LaTeX code with Candidate's Professional Summary content instead of template provided
+
+  **Experiences**
+  LaTeX code with Candidate's Working Experience content instead of template provided
+
+  **Education Section**
+  LaTeX code with Candidate's Education content instead of template provided
+
+  **Summary of Skills**
+  LaTeX code with Candidate's Summary of SKills content instead of template provided
+
+|'''
+
+_5_template_review = '''You are a professional LaTeX editor, please revise the revised resume given in LaTeX for any errors and consistency in formatting and the number of desired pages.
+
+# Steps to fit the resume content in the desired number of pages, trying it in this order.
+1. **Modify the margins and/or spacing**: Try adjusting the numerical values of some of the margins and spacing within the pre-amble.
+  - If this makes it fit, then please skill step 2 and move on to step 3.
+2. **Editing or removing the oldest work experiences the candidate has on their resume**:
+  - Look at editing and possibly removing the oldest work experiences on the Candidate's resume, perhaps making it more concise and/or removing some of those bullet points all all together.
+  - Assess if it now fits the desired number of pages. If it doesn't, then repeat the process from Step 1.
+3. **Review LaTeX code to ensure there are no errors**
+  - check for consistency in formatting and that it is error-free.
+  - Ensure there is a "\" before any "$" or "&".
+4. **Do a final check on the output**:
+  - Ensure there is a new line and properly inputted LaTeX code.
+  - Ensure all characters are correctly escaped.
+  - Ensure no part of the resume is accidentally commented out and not being activated.
+
+'''
+
+def get_llm_response(llm_selection: str, model_selection: str, messages: str):
     
     if llm_selection == "OpenAI":
         model = ChatOpenAI(model=model_selection, api_key=st.secrets.llm_keys.openai_key)
     elif llm_selection == "GoogleGemini":
-        model = ChatGoogleGenerativeAI(model=model_selection, api_key=st.secrets.llm_keys.google_gemini_key)
+        model = ChatGoogleGenerativeAI(model=model_selection, api_key=st.secrets.llm_keys.google_gemini_key, temperature=0.7)
     ai_message = model.invoke(messages)
-    st.write(ai_message.content)
+    return ai_message.content
+
+def get_revised_resume_chunks(llm_selection: str, model_selection: str, job_posting: str, latex_format: str, number_of_pages: int):
+    stage_1_messages =[ 
+        SystemMessage(content=prompts._1_initial_prompt),
+        AIMessage(content="Understood, I will wait for your next steps."),
+        SystemMessage(content=prompts._2_job_analysis),
+        AIMessage(content="Please send over the job posting so I can analyze it as directed."),
+        HumanMessage(f'''**Job Posting**:
+                     
+                     {job_posting}'''),
+        AIMessage("I identified all of the key skills, responsibilities, qualifications, and results desired by the hiring manager. I identified specific action words, priorities and themes used. I will use this analysis to guide the rest of my work."),
+        SystemMessage(content=prompts._3_analyze_experiences),
+        AIMessage(content="Understood, please send the Candidate's work experience and professional summary."),
+        HumanMessage(content=
+                     f'''Here are the Candidate's Work experiences and professional summary:
+                     
+                    **Professional Summary**
+                    {get_resume_formatted_for_llm("summary")}
+
+                    **Work Experience**
+                    {get_resume_formatted_for_llm("experience")}
+                     '''),
+        SystemMessage(content=prompts._4_generate_work_experiences),
+        AIMessage(content="I have generated the experience content for the candidate. I will provide this at the end once we're completed all of the steps. Provide the next steps."),
+        SystemMessage(content=prompts._5_generate_professional_summary),
+        AIMessage(content="I have generated the Professional Summary content for the candidate. I will provide this and the Experience content previously generated once we're completed all of the steps. Provide then next steps."),
+        SystemMessage(content=prompts._6_generate_summary_of_skills),
+        AIMessage(content="I have generated the Summary of Skills content for the candidate. I will provide the Summary of Skills content, Experience content previously generated and the Professional Summary content previously generated once we're completed all of the steps. Provide then next steps."),
+        SystemMessage(content=prompts._7_generate_career_taglines),
+        AIMessage(content="I have generated 3 career taglines that will be sent all together with the other previous content generated."),
+        SystemMessage(content=prompts._8_generate_message_to_hiring_manager),
+        AIMessage(content="I have drafted uo a message to the hiring manager and will send this all together"),
+        SystemMessage(content=prompts._9_output),
+        AIMessage(content="Please see below the candidate's content generated from the previous steps.")
+        ]
     
+    _1_experience_response = get_llm_response(llm_selection, model_selection, stage_1_messages)
+    with st.expander("Experience Response"):
+        st.write(_1_experience_response)
+
+    stage_2_messages =[
+        SystemMessage(content=_4_template_input),
+        AIMessage(content="Understood, I will wait for the individual pieces of information."),
+        HumanMessage(
+            content=
+            f'''
+            **Candidate's Professional Summary, Work Experience, Career Taglines, Summary of Skills**
+            {_1_experience_response}
+
+            **LaTeX Templates for Professional Summary**:
+            {latex_professional_summary}
+
+            **LaTeX Templates for Working Experience**:
+            {latex_working_experience}
+
+            **LaTeX Templates for Summary of Skills**:
+            {latex_summary_skills}
+
+            **Candidate's Contact Information**:
+            {get_resume_formatted_for_llm("contact")}
+            
+            **LaTeX Templates for contact information and career taglines**:
+            {latex_resume_header}
+
+            **Candidate's Education information**:
+            {get_resume_formatted_for_llm("education")}
+
+            '''
+        ),
+        AIMessage(content="Below is your Revised LaTeX snippets with the candidate's information for all of the sections: Contact Information with career tagline, professional summary, working experience, summary of skills, education"),
+        HumanMessage(content="Please input the revised LaTeX snippets into the following LaTeX template. I will provide the template in which you will be replacing the contents with in the next prompt."),
+        AIMessage(content="Understood, please provide the LaTeX template that I will input the candidate's resume into."),
+        HumanMessage(content=latex_jakes_resume),
+        AIMessage(content="Please see the copy and pasteable LaTeX Template with the candidate's information instead.")
+    ]
+
+    final_response = get_llm_response("GoogleGemini", "gemini-2.0-flash", stage_2_messages)
+    with st.expander("LaTeX Formatter response"):
+      st.write(final_response)
