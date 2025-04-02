@@ -4,6 +4,7 @@ from langchain_openai import ChatOpenAI
 from tools_general import login_user
 from tools_langchain import run_chain
 from tools_firebase import get_firestore_value
+from tools_llm import get_resume_formatted_for_llm
 
 if not st.experimental_user.is_logged_in:
     login_user()
@@ -43,3 +44,7 @@ else:
     if st.button("Create Resume", key="create_resume", type="primary"):
         with st.spinner("running...", show_time=True):
             run_chain(model_options[llm_selection]['langchain_model'], model_selection, job_posting)
+
+result = get_resume_formatted_for_llm("experience")
+st.write(type(result))
+st.write(result)
