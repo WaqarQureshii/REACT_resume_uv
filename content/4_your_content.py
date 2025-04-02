@@ -2,11 +2,14 @@ import streamlit as st
 
 from tools_general import login_user, generate_experience, find_next_id, generate_education, generate_summary
 from form_templates import contact_form
-from tools_firebase import create_firestore_document, upload_firebase_db
+from tools_firebase import create_firestore_document, upload_firebase_db, get_firestore_value
 
 
 if not st.experimental_user.is_logged_in:
     login_user()
+
+elif not get_firestore_value("subscription_status", "subscription_status").get("premium"):
+    st.warning("Need to be paid premium user")
     
 else:
     st.header(f"Welcome, {st.experimental_user.name}!")

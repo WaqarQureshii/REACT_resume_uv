@@ -28,6 +28,9 @@ def create_user_db(db: firestore.DocumentReference):
     contact_collection = db.collection("contact")
     contact_collection.document("contact").set(contact_data)
 
+    subscription_status_collection = db.collection("subscription_status")
+    subscription_status_collection.document("subscription_status").set({"premium": False})
+
     return db
 
 def get_user_db() -> firestore.DocumentReference:
@@ -39,7 +42,7 @@ def get_user_db() -> firestore.DocumentReference:
     
     return db
 
-def upload_firebase_db(firestore_collection_name: str, firestore_document_name:str, **fields: str|bool) -> None:
+def upload_firebase_db(firestore_collection_name: str, firestore_document_name:str, **fields: str|bool) -> dict:
     """
     Uploads data to a specified Firestore document within a collection.
 
@@ -99,38 +102,37 @@ def delete_firestore_document(firestore_collection_name: str, firestore_document
     db.collection(firestore_collection_name).document(firestore_document_name).delete()
 
 def get_resume_formatted_for_llm(collection_type: str) -> str:
-    user_db = get_user_db()
-    collections = user_db.collection(collection_type)
+    Candidate_db = get_user_db()
+    collections = Candidate_db.collection(collection_type)
 
-    result = []
+    result = []  # Holds properly formatted job experience blocks
 
     for doc in collections.stream():
-        data=doc.to_dict()
+        data = doc.to_dict()
         
-        if collection_type=="experience":
-            # Retrieve the job name and other fields
+        if collection_type == "experience":
+            # Retrieve primary job details
             job_title = data.get("role", "UNKNOWN ROLE")
             company = data.get("organization", "UNKNOWN ORGANIZATION")
             start_date = data.get("start_date", "YYYY-MM")
-            if data.get("present"):
-                end_date = "Present"
-            else:
-                end_date = data.get("end_date", "YYYY-MM")
-
+            job_linkedin_url = data.get("linkedin_url", "None")
+            end_date = "Present" if data.get("present") else data.get("end_date", "YYYY-MM")
             work_location = data.get("location", "UNKNOWN LOCATION")
 
-            experiences = [
-                value for key, value in data.items()
-                if key.startswith("experience_description") and value
-            ]
+            # Retrieve experience descriptions
+            experiences = [f"- {value}" for key, value in data.items() if key.startswith("experience_description") and value]
 
-            result.append(f"Title: {job_title}\n")
-            result.append(f"Company: {company}\n")
-            result.append(f"Start Date: {start_date}\n")
-            result.append(f"End Date: {end_date}\n")
-            result.append(f"Location: {work_location}\n")
-            for experience in experiences:
-                result.append(f"- {experience}")
+            # Group the full job experience into one block
+            job_experience_block = "\n".join([
+                f"**Title:** {job_title}",
+                f"**Company:** {company}",
+                f"**LinkedIn URL:** {job_linkedin_url}",
+                f"**Start Date:** {start_date} | **End Date:** {end_date}",
+                f"**Location:** {work_location}",
+                "\n".join(experiences)  # Add experience descriptions
+            ])
+
+            result.append(job_experience_block)
 
         if collection_type == "summary":
             skill = data.get("skill", "Unknown Skill")
@@ -142,6 +144,7 @@ def get_resume_formatted_for_llm(collection_type: str) -> str:
         if collection_type == "education":
             institution = data.get("institution", "Unknown institution")
             degree = data.get("degree", "Unknown degree")
+            education_url = data.get("website_url", "None")
             specialist = data.get("specialist", "Unknown")
             major = data.get("major", "Unknown")
             minor = data.get("minor", "Unknown")
@@ -152,6 +155,7 @@ def get_resume_formatted_for_llm(collection_type: str) -> str:
 
             result.append(f"Institution: {institution}")
             result.append(f"Degree: {degree}, Specialist: {specialist}, Major: {major}, Minor: {minor}")
+            result.append(f"Website URL: {education_url}\n")
             result.append(f"Location: {education_location}")
             result.append(f"Year Earned: {year_earned}")
             result.append(f"Additional Info: {additional_info}")
@@ -171,4 +175,4 @@ def get_resume_formatted_for_llm(collection_type: str) -> str:
             result.append(f"personal_website: {personal_website}")
 
 
-    return "\n".join(result)
+    return "\n\n".join(result).strip()

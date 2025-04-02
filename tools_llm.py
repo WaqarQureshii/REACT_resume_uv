@@ -2,9 +2,12 @@ from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
 import streamlit as st
 from langchain_openai import ChatOpenAI
 from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain.prompts import ChatPromptTemplate
+from langchain.schema.output_parser import StrOutputParser
+from langchain.schema.runnable import RunnableLambda, RunnableParallel
 
 from tools_firebase import get_firestore_collection, get_user_db
-from prompts import prompts
+from prompts import prompts_1
 
 def get_resume_formatted_for_llm(collection_type: str) -> str:
     Candidate_db = get_user_db()
@@ -146,91 +149,8 @@ latex_summary_skills = r'''
     \resumeItem{Bullet Point about Skills 3}
   \resumeItemListEnd
 '''
-latex_jakes_resume = r'''% FORMATTING START
-\documentclass[letterpaper,12pt]{article}
-
-\usepackage{latexsym}
-\usepackage[empty]{fullpage}
-\usepackage{titlesec}
-\usepackage{marvosym}
-\usepackage[usenames,dvipsnames]{color}
-\usepackage{verbatim}
-\usepackage{enumitem}
-\usepackage[hidelinks]{hyperref}
-\usepackage{fancyhdr}
-\usepackage[english]{babel}
-\usepackage{tabularx}
-\input{glyphtounicode}
-\usepackage{fontawesome}
-
-\pagestyle{fancy}
-\fancyhf{}
-\fancyfoot{}
-\renewcommand{\headrulewidth}{0pt}
-\renewcommand{\footrulewidth}{0pt}
-
-\addtolength{\oddsidemargin}{-0.6in}
-\addtolength{\evensidemargin}{-0.6in}
-\addtolength{\textwidth}{1in}
-\addtolength{\topmargin}{-.6in}
-\addtolength{\textheight}{0.2in}
-\addtolength{\textheight}{-0.01in}
-
-\urlstyle{same}
-
-\raggedbottom
-\raggedright
-\setlength{\tabcolsep}{0in}
-
-\titleformat{\section}{
-  \vspace{-4pt}\scshape\raggedright\large
-}{}{0em}{}[\color{black}\titlerule \vspace{-8pt}]
-
-\pdfgentounicode=1
-
-\newcommand{\resumeItem}[1]{
-  \item\small{
-    {#1 \vspace{-2pt}}
-  }
-}
-
-\newcommand{\resumeSubheading}[4]{
-  \vspace{4pt}\item
-    \begin{tabular*}{0.97\textwidth}[t]{l@{\extracolsep{\fill}}r}
-      \textbf{#1} & #2 \\
-      \textit{\small#3} & \textit{\small #4} \\
-    \end{tabular*}\vspace{-5pt}
-}
-
-\newcommand{\resumeSubSubheading}[2]{
-    \item
-    \begin{tabular*}{0.97\textwidth}{l@{\extracolsep{\fill}}r}
-      \textit{\small#1} & \textit{\small #2} \\
-    \end{tabular*}\vspace{-7pt}
-}
-
-\newcommand{\resumeProjectHeading}[2]{
-    \item
-    \begin{tabular*}{0.97\textwidth}{l@{\extracolsep{\fill}}r}
-      \small#1 & #2 \\
-    \end{tabular*}\vspace{-7pt}
-}
-
-\newcommand{\resumeSubItem}[1]{\resumeItem{#1}\vspace{-4pt}}
-
-\renewcommand\labelitemii{$\vcenter{\hbox{\tiny$\bullet$}}$}
-
-\newcommand{\resumeSubHeadingListStart}{\begin{itemize}[leftmargin=0.07in, label={}]}
-\newcommand{\resumeSubHeadingListEnd}{\end{itemize}}
-\newcommand{\resumeItemListStart}{\begin{itemize}}
-\newcommand{\resumeItemListEnd}{\end{itemize}\vspace{-5pt}}
-
-\begin{document}
-
-% FORMATTING END
-
-% RESUME START
-% Header
+latex_jakes_resume = r'''
+%% HEADER SECTION
 \begin{center}
     \textbf{\LARGE [Your Name, Your Designation]} \\
     \smallskip
@@ -238,6 +158,7 @@ latex_jakes_resume = r'''% FORMATTING START
     \faLinkedinSquare \ \href{https://www.linkedin.com/in/username/}{linkedin.com/in/yourprofile} \quad \faEnvelope \ \href{mailto:your.email@example.com}{your.email@example.com} \quad \faPhone \ ([Your Phone Number])
 \end{center}
 
+%% PROFESSIONAL SUMMARY SECTION
 \section{Professional Summary}
   \resumeItemListStart
     \resumeItem{Bullet Point about Professional Summary 1}
@@ -245,6 +166,7 @@ latex_jakes_resume = r'''% FORMATTING START
     \resumeItem{Bullet Point about Professional Summary 3}
   \resumeItemListEnd
 
+%% WORK EXPERIENCE SECTION
 \section{Experience}
   \resumeSubHeadingListStart
 
@@ -268,6 +190,7 @@ latex_jakes_resume = r'''% FORMATTING START
 
   \resumeSubHeadingListEnd
 
+%% EDUCATION SECTION
 \section{Education}
   \resumeSubHeadingListStart
     \resumeSubheading
@@ -278,21 +201,18 @@ latex_jakes_resume = r'''% FORMATTING START
       {[University Name]}{[Location]}
   \resumeSubHeadingListEnd
 
-
-\section{Skills}
+%% SUMMARY OF SKILLS SECTION
+\section{Summary of Skills}
   \resumeItemListStart
     \resumeItem{Bullet Point about Skills 1}
     \resumeItem{Bullet Point about Skills 2}
     \resumeItem{Bullet Point about Skills 3}
   \resumeItemListEnd
-
-\end{document}
 '''
 
 latex_options ={
     "jakes_resume": latex_jakes_resume
 }
-
 
 _4_template_input = f'''You be a professional LaTeX editor by taking given LaTeX snippets of code and replacing the information in it with information I provide to you keeping the same format. Here is what you will be provided after:
   1. Candidate contact information and the appropriate LaTeX snippet.
@@ -370,17 +290,18 @@ def get_llm_response(llm_selection: str, model_selection: str, messages: str):
     ai_message = model.invoke(messages)
     return ai_message.content
 
+
 def get_revised_resume_chunks(llm_selection: str, model_selection: str, job_posting: str, latex_format: str, number_of_pages: int):
     stage_1_messages =[ 
-        SystemMessage(content=prompts._1_initial_prompt),
+        SystemMessage(content=prompts_1._1_initial_prompt),
         AIMessage(content="Understood, I will wait for your next steps."),
-        SystemMessage(content=prompts._2_job_analysis),
+        SystemMessage(content=prompts_1._2_job_analysis),
         AIMessage(content="Please send over the job posting so I can analyze it as directed."),
         HumanMessage(f'''**Job Posting**:
                      
                      {job_posting}'''),
         AIMessage("I identified all of the key skills, responsibilities, qualifications, and results desired by the hiring manager. I identified specific action words, priorities and themes used. I will use this analysis to guide the rest of my work."),
-        SystemMessage(content=prompts._3_analyze_experiences),
+        SystemMessage(content=prompts_1._3_analyze_experiences),
         AIMessage(content="Understood, please send the Candidate's work experience and professional summary."),
         HumanMessage(content=
                      f'''Here are the Candidate's Work experiences and professional summary:
@@ -391,17 +312,17 @@ def get_revised_resume_chunks(llm_selection: str, model_selection: str, job_post
                     **Work Experience**
                     {get_resume_formatted_for_llm("experience")}
                      '''),
-        SystemMessage(content=prompts._4_generate_work_experiences),
+        SystemMessage(content=prompts_1._4_generate_work_experiences),
         AIMessage(content="I have generated the experience content for the candidate. I will provide this at the end once we're completed all of the steps. Provide the next steps."),
-        SystemMessage(content=prompts._5_generate_professional_summary),
+        SystemMessage(content=prompts_1._5_generate_professional_summary),
         AIMessage(content="I have generated the Professional Summary content for the candidate. I will provide this and the Experience content previously generated once we're completed all of the steps. Provide then next steps."),
-        SystemMessage(content=prompts._6_generate_summary_of_skills),
+        SystemMessage(content=prompts_1._6_generate_summary_of_skills),
         AIMessage(content="I have generated the Summary of Skills content for the candidate. I will provide the Summary of Skills content, Experience content previously generated and the Professional Summary content previously generated once we're completed all of the steps. Provide then next steps."),
-        SystemMessage(content=prompts._7_generate_career_taglines),
+        SystemMessage(content=prompts_1._7_generate_career_taglines),
         AIMessage(content="I have generated 3 career taglines that will be sent all together with the other previous content generated."),
-        SystemMessage(content=prompts._8_generate_message_to_hiring_manager),
+        SystemMessage(content=prompts_1._8_generate_message_to_hiring_manager),
         AIMessage(content="I have drafted uo a message to the hiring manager and will send this all together"),
-        SystemMessage(content=prompts._9_output),
+        SystemMessage(content=prompts_1._9_output),
         AIMessage(content="Please see below the candidate's content generated from the previous steps.")
         ]
     
