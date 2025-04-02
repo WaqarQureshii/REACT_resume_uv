@@ -1,6 +1,6 @@
 import streamlit as st
 
-from firebase_tools import get_user_db, get_firestore_collection
+from tools_firebase import get_user_db, get_firestore_collection
 from form_templates import experience_form, education_form, summary_form
 
 from typing import Optional

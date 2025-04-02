@@ -1,6 +1,6 @@
 import streamlit as st
 
-from firebase_tools import upload_firebase_db, get_firestore_value, delete_firestore_document
+from tools_firebase import upload_firebase_db, get_firestore_value, delete_firestore_document
 
 
 def contact_form() -> None:
@@ -83,6 +83,11 @@ def experience_form(id: int, existing_experience: bool) -> None:
                                   placeholder="Analyst",
                                   key=f"role_{id}")
 
+        linkedin_url = st.text_input("LinkedIN URL of company",
+                                 value=document_dict.get("linkedin_url", None),
+                                 placeholder="https://www.linkedin.com/company/deloitte/",
+                                 key=f"linkedin_url_{id}")
+        
         row2 = st.columns([1,1,3])
         start_date = row2[0].text_input("Start Date",
                                         value = document_dict.get("start_date",None),
@@ -159,6 +164,7 @@ def experience_form(id: int, existing_experience: bool) -> None:
                                organization=organization,
                                present=present,
                                role=role,
+                               linkedin_url=linkedin_url,
                                start_date=start_date,
                                end_date=end_date,
                                location=location,
@@ -237,8 +243,14 @@ def education_form(id: int, existing_education: bool) -> None:
                                              placeholder="Graduated with Distinction",
                                              key=f"additional_info_{id}")
         
-        row5 = st.columns([1,1,10])
-        submitted = row5[0].form_submit_button("Submit", type="primary")
+        row5=st.columns(1)
+        website_url = row5[0].text_input("Website/URL",
+                                           value=document_dict.get("website_url", None),
+                                           placeholder="www.udemy.com/certificate/f2l3k4j5345",
+                                           key=f"website_url_{id}")
+
+        row6 = st.columns([1,1,10])
+        submitted = row6[0].form_submit_button("Submit", type="primary")
         if submitted:
             upload_firebase_db("education",
                                f"education_{id}",
@@ -250,10 +262,11 @@ def education_form(id: int, existing_education: bool) -> None:
                                major=major,
                                minor=minor,
                                gpa=gpa,
-                               additional_info=additional_info)
+                               additional_info=additional_info,
+                               website_url=website_url)
             
         if existing_education:
-            delete_option = row5[1].form_submit_button("Delete", type="secondary")
+            delete_option = row6[1].form_submit_button("Delete", type="secondary")
             if delete_option:
                 delete_firestore_document("education", f"education_{id}")
                 st.switch_page("content/4_your_content.py")
