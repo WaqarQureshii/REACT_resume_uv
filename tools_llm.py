@@ -7,7 +7,6 @@ from langchain.schema.output_parser import StrOutputParser
 from langchain.schema.runnable import RunnableLambda, RunnableParallel
 
 from tools_firebase import get_firestore_collection, get_user_db
-from prompts import prompts_1
 
 def get_resume_formatted_for_llm(collection_type: str) -> str:
     Candidate_db = get_user_db()
