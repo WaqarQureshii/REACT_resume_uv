@@ -77,7 +77,8 @@ def experience_form(id: int, existing_experience: bool) -> None:
             placeholder="ABC Corporation",
             key=f"organization_{id}")
         present = row1[1].checkbox("Present Role?",
-                                   key=f"present_{id}")
+                                   key=f"present_{id}",
+                                   value=document_dict.get("present", None))
         role = row1[2].text_input("Role at Organization",
                                   value = document_dict.get("role",None),
                                   placeholder="Analyst",
