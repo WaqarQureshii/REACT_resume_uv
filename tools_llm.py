@@ -151,7 +151,7 @@ def get_resume_formatted_for_llm(collection_type: str) -> str:
 
             result.append(f"Institution: {institution}")
             result.append(f"Degree: {degree}, Specialist: {specialist}, Major: {major}, Minor: {minor}")
-            result.append(f"Website URL: {education_url}\n")
+            result.append(f"Website URL: {education_url}")
             result.append(f"Location: {education_location}")
             result.append(f"Year Earned: {year_earned}")
             result.append(f"Additional Info: {additional_info}")

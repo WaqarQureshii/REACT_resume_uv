@@ -14,7 +14,7 @@ elif not get_firestore_value("subscription_status", "subscription_status").get("
     st.warning("Need to be paid premium user")
 
 else:
-    st.header(f"Create your resume1, {st.experimental_user.name} by following the easy steps below!")
+    st.header(f"Create your resume, {st.experimental_user.name} by following the easy steps below!")
 
     col1, col2, col3, col4 = st.columns(4)
 
