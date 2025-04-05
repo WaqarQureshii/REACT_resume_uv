@@ -4,6 +4,8 @@ from langchain_openai import ChatOpenAI
 from tools_general import login_user
 from tools_langchain import run_chain
 from tools_firebase import get_firestore_value
+from tools_langchain import get_resume_information_in_list
+
 
 if not st.experimental_user.is_logged_in:
     login_user()
@@ -26,8 +28,8 @@ else:
     model_options = {
         "OpenAI": {"langchain_model": "OpenAI",
                    "options": ["o3-mini-2025-01-31", "o1-2024-12-17", "o1-mini-2024-09-12", "gpt-4o-2024-08-06"]},
-        # "Google Gemini": {"langchain_model": "GoogleGemini",
-        #                   "options": ["gemini-1.5-pro", "gemini-2.0-flash", "gemini-2.0-flash-lite", "gemini-2.5-pro-exp-03-25"]}
+        "Google Gemini": {"langchain_model": "GoogleGemini",
+                          "options": ["gemini-1.5-pro", "gemini-2.0-flash", "gemini-2.0-flash-lite", "gemini-2.5-pro-exp-03-25"]}
     }
 
 
@@ -41,5 +43,6 @@ else:
     job_posting = st.text_area("Input your job description", height=300)
     
     if st.button("Create Resume", key="create_resume", type="primary"):
-        with st.spinner("running...", show_time=True):
-            run_chain(model_options[llm_selection]['langchain_model'], model_selection, job_posting)
+        run_chain(model_options[llm_selection]['langchain_model'], model_selection, job_posting)
+
+    result = get_resume_information_in_list("experience")

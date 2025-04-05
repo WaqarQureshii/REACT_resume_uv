@@ -1,7 +1,3 @@
-from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
-from tools_firebase import get_user_db, get_resume_formatted_for_llm
-
-
 chain_1_job_analysis = '''
 Analyze the following job posting that I will provide to you. Identify all of the key skills, responsibilities, qualifications, and results/achievements the hiring manager is looking for. Extract specific action words, priorities, and themes used in the job description.
 
@@ -96,45 +92,38 @@ chain_2e_candidate_analysis = '''
 {candidate_professional_summary}
 '''
 
-chain_3aa_work_experience = '''Please create a revised work experience section for each job the candidate held by using a combination of the "Highly Refined Bullet Points" and the "Candidate's current work experience", in the context of the candidate analysis provided to you.
-You will be provided with the following after this as you ask for them:
-  1) Candidate Analysis.
-  2) The Candidate's current job experiences.
-  3) Highly Refined Bullet Points.'''
+chain_3aa_work_experience = '''Please create a work experience section for the provided job the candidate held to you. You will do this by:
+1) Understanding what the Hiring Manager is looking for by assessing the Job Analysis provided to you later.
+2) Combine the "Highly Refined Bullet Points" that will be provided to you later and the "Candidate Analysis" that is provided to you.
+As mentioned, you will be provided with the following after this as you ask for them:
+  1) Candidate Analysis
+  2) Job Analysis
+  3) Candidate's working experience
+  4) Highly Refined Bullet Points.'''
 
-chain_3ab = '''Understand the Candidate Analysis provided to you and all of the relevant suggestions, strengths and weaknesses.'''
+chain_3ab = '''Understand the Candidate Analysis provided to you and all of the relevant suggestions, strengths and weaknesses. Understand it in the context of the Job Posting Analysis provided to you to understand what the Hiring Manager is looking for.'''
 
-chain_3ac_work_experience = '''Read the Candidate's current job experiences in the context of the candidate analysis and note areas of improvement, gaps, points of alignments, or points that can be revamped or replaced.'''
+chain_3ac_work_experience = '''I will now '''
 
-chain_3ad_work_experience = '''
+chain_3ad_work_experience = '''Completely re-write and 6 bulletpoints for the candidate's work experience by completely re-writing the whole thing from scratch. Combine everything you have to do this such as combining the Candidate Analysis, Job Posting Analysis, Highly Refined Bullet Points and Candidate's Work Experience.
 # Steps
-  1) Now go through all of the candidate's existing work experiences one-by-one, replace or combine as many points in the candidate's job experiences for each job with the Highly Refined Bullet Points. Combine or replace bullet points that are less impactful with the highly refined ones and take into the consideration the candidate analysis, trying to implement as much as you can.
-  2) Once completed all the bullet points for each job, be sure to implement some of the key words and themes as well.
-  3) Lastly, go through each bullet point once more to use either a W,X,Y,Z format or Z,X,Y format where
-    W = Specifics of the action Z below, such as "leveraging strong technical background in SQL and Generative AI tools"
-    X = the result (try to fit in language from the job posting) such as "Reduced errors",
-    Y = the quantifiable impact such as "by 40%",
-    Z = how it was accomplished (try to utilize the job posting analysis provided), for example "after creating a new Standard Operating Procedure.":
+  1) Once completed all the bullet points for each job, be sure to implement some of the key words and themes as well.
+  2) Lastly, go through each bullet point once more to use either a W,X,Y,Z format or Z,X,Y format where
+    W = Specifics of the action Z below, EXAMPLE: "leveraging strong technical background in SQL and Generative AI tools"
+    X = the result (try to fit in language from the job posting). FOR EXAMPLE: "Reduced errors",
+    Y = the quantifiable impact. FOR EXAMPLE: "by 40%",
+    Z = how it was accomplished (try to utilize the job posting analysis provided), FOR EXAMPLE: "after creating a new Standard Operating Procedure.":
     # Example of X,Y,Z,W: Reduced errors by 40% after creating a new Standard Operating Procedure leveraging strong technical background in SQL and Generative AI tools.
     # Example of Z,X,Y,W: Spearheaded Power BI Implementation enterprise wide that reduced time generating manual reports by 2 business days, involving 2 weeks of change management training.
   4) After you have a new refined and aligned bullet point set for each job experience, sort the bullet points for each job from most attractive to the Hiring Manager to the least.
 
 # Output Format:
   Candidate's Role @ Candidate's Company Workd At. City, Country. [Start Date] - [End Date or Present]. URL Link to Company:
-  - Highly tailored Bullet point 1
-  - Highly tailored Bullet point 2
-  - Highly tailored Bullet point 3
-  - Highly tailored Bullet point 4
-  - Highly tailored Bullet point 5
-
-  Candidate's Role @ Candidate's Company Workd At. City, Country. [Start Date] - [End Date or Present]. URL Link to Company:
-  - Highly tailored Bullet point 1
-  - Highly tailored Bullet point 2
-  - Highly tailored Bullet point 3
-  - Highly tailored Bullet point 4
-  - Highly tailored Bullet point 5
-
-  Etc. All of CANDIDATE'S JOB EXPERIENCES'''
+  - Impactful Bullet Point
+  - Impactful Bullet Point
+  - Impactful Bullet Point
+  - Impactful Bullet Point
+  - Impactful Bullet Point'''
 # Returns suggestions to make to existing experience
 
 
@@ -189,8 +178,8 @@ chain_4a_generate_summary_of_skills ='''Your next task is to utilize the analysi
   - Highly tailored Professional Summary Bullet point 5
 '''
 
-chain_4d_generate_career_taglines = '''**Generate 3 career taglines that are relevant to the job posting utilizing the analysis denoted by ANALYSIS**: Ensure they are descriptive of skills rather than a specific role or position.
-  - Keep it related to technical skills, high-level accomplishments and soft skills.
+chain_4d_generate_career_taglines = '''**Generate 3 career taglines that are relevant to the job posting utilizing the analysis provided to you: Ensure they are descriptive of skills rather than a specific role or position.
+  - Keep it related to technical skills, high-level accomplishments and soft skills required by the job.
   - Keep it to 2-3 words max for each tagline.
   - Output 3 taglines.
   
@@ -198,13 +187,10 @@ chain_4d_generate_career_taglines = '''**Generate 3 career taglines that are rel
   Tagline 1, Tagline 2, Tagline 3
   '''
 
-chain_5a_generate_cover_letter = '''Write up a very concise and to the point cover letter incorporating bullet points into the content to make it easy to read. Utilize the generated resume.
+chain_5a_generate_cover_letter = '''Write up a very concise and to the point cover letter incorporating bullet points into the content to make it easy to read. Utilize work experience points and professionaly summary points provided to you as well as the job analysis..
   **Notes**:
     - Incorporate and naturally pack appropriate skills used into the cover letter.
-    - Incorporate my voice by adding my achievements and anecdotes that only I could have provided.
-    
-  **Information to use about the candidate and job analysis:
-  {compiled_resume_information}'''
+    - Incorporate my voice by adding my achievements and anecdotes that only I could have provided.'''
 
 
 chain_5b_generate_latex_resume = '''You will use a LaTeX template that will be provided later to edit with the candidate's information.:
