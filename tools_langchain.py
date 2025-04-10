@@ -138,7 +138,7 @@ class ResumeGenerator:
         work_exp_chain = RunnableLambda(self.generate_tailored_work_experience or progress_bar.progress(percent_complete, "Drafting highly-tailored professional summary points")) | self.model | StrOutputParser() | RunnableLambda(self._pause_execution)
         prof_summary_chain = RunnableLambda(self.generate_tailored_prof_summary or progress_bar.progress(percent_complete, "Drafting highly-tailored summary of skills points")) | self.model | StrOutputParser() | RunnableLambda(self._pause_execution)
         summary_of_skills_chain = RunnableLambda(self.generate_summaryofskills or progress_bar.progress(percent_complete, "Generating 3 highly-tailored career taglines")) | self.model | StrOutputParser() | RunnableLambda(self._pause_execution)
-        career_tagline_chain = RunnableLambda(self.generate_career_tagline) | self.model | StrOutputParser() | RunnableLambda(lambda x: self.input_dict.update({"Career Taglines": x}) or all_sections.append("Career Taglines") or self._pause_execution)
+        career_tagline_chain = RunnableLambda(self.generate_career_tagline) | self.model | StrOutputParser() | RunnableLambda(self._pause_execution)
 
         analysis_chain = (
             job_analysis_prompt
