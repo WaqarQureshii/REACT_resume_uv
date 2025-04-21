@@ -2,14 +2,15 @@ import streamlit as st
 from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
 from langchain_openai import ChatOpenAI
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain.prompts import ChatPromptTemplate
+from langchain.prompts import ChatPromptTemplate, PromptTemplate
 from langchain.schema.output_parser import StrOutputParser
-from langchain.schema.runnable import RunnableLambda, RunnableParallel
+from langchain.schema.runnable import RunnableLambda, RunnableParallel, RunnablePassthrough
 from pprint import pprint
 
 from tools_firebase import get_resume_formatted_for_llm
 from tools_llm import get_resume_information_in_list
 from prompts import prompts
+from prompts.prompts import job_analysis, candidate_analysis, ai_work_experience, ai_professional_summary, ai_career_taglines, ai_summary_of_skills, revision_work_exp1, revision_work_exp2, revision_professional_summary, generate_cover_letter, generate_message_to_hiring_manager
 from templates.jakes_resume import jakes_resume, full_jakes_resume
 
 import time
@@ -40,20 +41,15 @@ def create_llm_model(llm_selection: str, model_selection: str):
             temperature=0.7
         )
 
-
-def generate_prompt(prompt_text, ai_message):
-    """Create a prompt template with the given system prompt and AI message."""
-    return ChatPromptTemplate.from_messages([
-        ("system", prompt_text),
-        ("ai", ai_message)
-    ])
-
-
 class ResumeGenerator:
     def __init__(self, llm_selection, model_selection, job_posting):
         self.model = create_llm_model(llm_selection, model_selection)
         self.job_posting = job_posting
         self.input_dict = {}
+        self.percent_complete = 0
+        percent_complete = 0
+        self.progress_bar = st.progress(percent_complete, text="Performing Job Posting analysis")
+        self.revision_tab, self.analysis_tab, self.ai_content = st.tabs(["Revised Resume Sections", "Analysis", "AI Generated Content"])
         
         # Get resume sections
         self.contact_info = get_resume_formatted_for_llm("contact")
@@ -62,267 +58,172 @@ class ResumeGenerator:
         self.work_experience = get_resume_formatted_for_llm("experience")
 
         self.input_dict.update({
-            "Candidate's Existing Working Experience": get_resume_formatted_for_llm("experience"),
-            "Candidate's Existing Professional Summary": get_resume_formatted_for_llm("summary"),
+            "candidate_experience_list": get_resume_formatted_for_llm("experience"),
+            "candidate_professional_summary": get_resume_formatted_for_llm("summary"),
             "Candidate's Contact Information": get_resume_formatted_for_llm("contact"),
             "Candidate's Education": get_resume_formatted_for_llm("education"),
-            "Job Posting": job_posting,
-            "Revised Work Experience": [],
+            "job_posting": job_posting,
+            "revised_work_exp": "",
+            "work_exp_to_be_revised": "",
             "Cover Letter": None
         })
     
-        
-    def generate_tailored_work_experience(self, analysis):
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", prompts.chain_2a_tailored_work_exp)
-        ])
-        return prompt.format_prompt()
-    
-    def generate_tailored_prof_summary(self, analysis):
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", prompts.chain_2b_tailored_prof_summary)
-        ])
-        return prompt.format_prompt()
-    
-    def generate_summaryofskills(self, analysis):
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", prompts.chain_2c_tailored_summaryofskills)
-        ])
-        return prompt.format_prompt()
-    
-    def candidate_analysis(self, analysis):
-        prompt = ChatPromptTemplate.from_messages([
-            ("human", prompts.chain_2e_candidate_analysis),
-            ("ai", "Understood, I understand the Job Analysis, now please provide the Candidate's Existing Working Experience as well as the Candidate's Existing Professional Summary. Start with the Working Experience"),
-            ("human", self.input_dict["Candidate's Existing Working Experience"]),
-            ("ai", "Perfect, now provide the Candidate's existing professional summary"),
-            ("human", self.input_dict["Candidate's Existing Professional Summary"]),
-            ("ai", "I have everything I need to complete the candidate analysis steps that you provided in the output format you outlined. Please see my response:")
-        ])
-        return prompt.format_prompt(candidate_experience_list=self.work_experience, candidate_professional_summary=self.professional_summary)
-    
-    def generate_career_tagline(self, analysis):
-        prompt=ChatPromptTemplate.from_messages([
-            ("system", prompts.chain_2d_career_taglines)
-        ])
-        return prompt.format_prompt()
-    
-    def _pause_execution(self, x):
+    def _pause_execution(self):
         "Pause for one minute before proceeding."
         time.sleep(60)
-        return x
 
-    def _assess_completion(self, x, current_percent, increase) -> int:
-        new_percent = current_percent + increase
-        return new_percent
+    def _assess_completion(self, increase:int, description: str):
+        new_percent = self.percent_complete+increase
+        self.progress_bar.progress(new_percent, description)
 
     def run(self):
         """Run the complete resume generation pipeline and display results."""
-
-        percent_complete = 0
-        progress_bar = st.progress(percent_complete, text="Performing Job Posting analysis")
-        # Initial analysis chain
-        job_analysis_prompt = ChatPromptTemplate.from_messages([
-        ("human", prompts.chain_1_job_analysis),
-        ("ai", "Understood. Please send over the job posting"),
-        ("human", self.job_posting)
-        ])
-
-########### STAGE 1 ########
-# ANALYSIS
-        # job_analysis_model = create_llm_model("OpenAI", "o3-mini-2025-01-31")
         all_sections = []
-        
-        percent_complete+=10
-        candidate_analysis_chain = RunnableLambda(self.candidate_analysis or progress_bar.progress(percent_complete, "Drafting highly-tailored work experience points")) | self.model | StrOutputParser() | RunnableLambda(self._pause_execution)
-        work_exp_chain = RunnableLambda(self.generate_tailored_work_experience or progress_bar.progress(percent_complete, "Drafting highly-tailored professional summary points")) | self.model | StrOutputParser() | RunnableLambda(self._pause_execution)
-        prof_summary_chain = RunnableLambda(self.generate_tailored_prof_summary or progress_bar.progress(percent_complete, "Drafting highly-tailored summary of skills points")) | self.model | StrOutputParser() | RunnableLambda(self._pause_execution)
-        summary_of_skills_chain = RunnableLambda(self.generate_summaryofskills or progress_bar.progress(percent_complete, "Generating 3 highly-tailored career taglines")) | self.model | StrOutputParser() | RunnableLambda(self._pause_execution)
-        career_tagline_chain = RunnableLambda(self.generate_career_tagline) | self.model | StrOutputParser() | RunnableLambda(self._pause_execution)
 
-        analysis_chain = (
-            job_analysis_prompt
+        # Stage 1: Job Posting and Candidate Analysis
+        job_analysis_chain = (
+            job_analysis()
             | self.model
             | StrOutputParser()
-            | RunnableLambda(lambda x: self.input_dict.update({"Job Analysis": x}) or all_sections.append("Job Analysis") or percent_complete+11 or progress_bar.progress(percent_complete, "Performing analysis on the candidate") or x)
-            | RunnableLambda(self._pause_execution)
-            | RunnableParallel(branches={
-                "Candidate Analysis": candidate_analysis_chain,
-                "Suggested Work Experience": work_exp_chain,
-                "Suggested Professional Summary": prof_summary_chain,
-                "Suggested Summary of Skills": summary_of_skills_chain,
-                "Suggested Career Taglines": career_tagline_chain,
-                }
-                )
+            | RunnableLambda(lambda x: self.input_dict.update({"job_posting_analysis": x}) or all_sections.append("job_posting_analysis")
+            )
         )
-        analysis_result = analysis_chain.invoke({})
+        self._assess_completion(10, "Performing analysis on the candidate")
+        job_analysis_chain.invoke(self.input_dict)
 
 
-        for key in ["Suggested Work Experience", "Suggested Professional Summary", "Suggested Summary of Skills", "Suggested Career Taglines", "Candidate Analysis"]:
-            all_sections.append(key)
-            self.input_dict[key] = analysis_result["branches"][key]
+        candidate_analysis_chain = (
+            candidate_analysis()
+            | self.model
+            | StrOutputParser()
+            | RunnableLambda(lambda x: self.input_dict.update({"candidate_analysis": x}) or all_sections.append("candidate_analysis"))
+        )
+        candidate_analysis_chain.invoke(self.input_dict)
+        self._assess_completion(15, "Generating highly tailored resume content based on a fictitious candidate.")
+        candidate_analysis_chain.invoke(self.input_dict)
+        self._pause_execution()
+
+        # Stage 2: Generate Tailored Resume Content
+        ai_chain = (
+            RunnableParallel(branches={
+                "Suggested Work Experience": RunnableLambda(ai_work_experience) | self.model | StrOutputParser() | RunnableLambda(lambda x: self.input_dict.update({"ai_work_exp": x}) or all_sections.append("ai_work_exp")),
+                "Suggested Professional Summary": RunnableLambda(ai_professional_summary) | self.model | StrOutputParser() | RunnableLambda(lambda x: self.input_dict.update({"ai_prof_summary": x}) or all_sections.append("ai_prof_summary")),
+                "Suggested Career Taglines": RunnableLambda(ai_career_taglines) | self.model | StrOutputParser() | RunnableLambda(lambda x: self.input_dict.update({"ai_career_taglines": x}) or all_sections.append("ai_career_taglines")),
+                "Suggested Summary of Skills": RunnableLambda(ai_summary_of_skills) | self.model | StrOutputParser() | RunnableLambda(lambda x: self.input_dict.update({"ai_summary_of_skills": x}) or all_sections.append("ai_summary_of_skills")),
+                }
+            )
+        )
+        ai_chain.invoke(self.input_dict)
+        self._assess_completion(25, "Revising candidate's work experience.")
+        ai_chain.invoke(self.input_dict)
+        self._pause_execution()
 
 
-########## STAGE 2 ###########
-# Generating Final Resume Content
+        # Stage 3: Revision of Work Experience
         experiences = get_resume_information_in_list("experience")
-        
-        percent_complete+=42
-        progress_bar.progress(percent_complete, "Revising candidate's work experience points")
-
         for exp in experiences:
-            generating_work_experience = ChatPromptTemplate.from_messages([
-            ("human", prompts.chain_3aa_work_experience),
-            ("ai", "Understood. Please send over the the Candidate Analysis, Job Posting Analysis, Candidate's Work Experience and Highly Refined Bullet Points one-by-one as I tell you. Please send the Candidate Analysis and Job Posting Analysis first."),
-            ("human", f"{prompts.chain_3ab}. **Candidate Analysis**: {self.input_dict["Candidate Analysis"]}; **Job Posting Analysis**: {self.input_dict["Job Analysis"]}"),
-            ("ai", "Understood, I have a good understanding of the candidate's analysis and Job Analysis that I will use as a guide going forward. Send the Candidate's current job experience that needs to be completely edited."),
-            ("human", f"**Candidate's Current Work Experience**: {exp}"),
-            ("ai", "I am ready to re-write the candidate's work experiences to align with the job posting. Perhaps send me some bullet points that are highly tailored to the job posting."),
-            ("human", f"Highly Refined Bullet Points: {self.input_dict["Suggested Work Experience"]}"),
-            ("ai", "Perfect, I have everything I need to perform the next steps. Please provide the next steps."),
-            ("human", prompts.chain_3ad_work_experience),
-            ])
+            job_title = exp.split("\n")[0].replace("Job Title: ", "").strip()
+            company = exp.split("\n")[1].replace("Organization Name: ", "").strip()
+            self._assess_completion(0, f"Working on {job_title} @ {company}")
+            
+            self.input_dict.update({"work_exp_to_be_revised": exp})
 
-            work_experience_chain = (
-                generating_work_experience
+            work_revision_chain = (
+                revision_work_exp2()
                 | self.model
                 | StrOutputParser()
-                | RunnableLambda(self._pause_execution)
-                | RunnableLambda(lambda x: self.input_dict["Revised Work Experience"].append(x))
+                | RunnableLambda(lambda x: self.input_dict.update({"revised_work_exp": self.input_dict["revised_work_exp"] + x + "\n\n"}))
             )
-            
-            work_experience_chain.invoke({})
+            work_revision_chain.invoke(self.input_dict)
 
-        all_sections.append("Revised Work Experience")
+        all_sections.append("revised_work_exp")
+        self._assess_completion(25, "Revising candidate's professional summary section")
+        self._pause_execution()
 
-        percent_complete+=18
-        progress_bar.progress(percent_complete, "Revising candidate's Professional Summary")
-
-        generating_prof_summary = ChatPromptTemplate.from_messages([
-        ("human", prompts.chain_3ba_professional_summary),
-        ("ai", "Understood. Please send over the the Candidate Analysis, Candidate's Professional Summary and Highly Refined Bullet Points one-by-one as I tell you. Please send the Candidate Analysis first."),
-        ("human", f"{prompts.chain_3bb_professional_summary}. **Candidate Analysis**: {self.input_dict["Candidate Analysis"]}"),
-        ("ai", "Understood, I have a good understanding of the candidate's analysis that I will use a guide going forward. Send the Candidate's current professional summary."),
-        ("human", f"{prompts.chain_3bc_professional_summary}. **Candidate's Current Professional Summary**: {self.input_dict["Candidate's Existing Professional Summary"]}"),
-        ("ai", "Based on the candidate analysis I have noted some weak bullet points that need to be replaced and some refinements that need to be made. Please send over the Highly Refined Bullet Points now."),
-        ("human", f"Highly Refined Bullet Points: {self.input_dict["Suggested Professional Summary"]}"),
-        ("ai", "Perfect, I have everything I need to perform the next steps. Please provide them."),
-        ("human", prompts.chain_3bd_professional_summary),
-        ])
-
-        professional_summary_chain = (
-            generating_prof_summary
+        # Stage 4: Revision of Professional Summary
+        prof_summary_revision_chain = (
+            revision_professional_summary()
             | self.model
             | StrOutputParser()
-            | RunnableLambda(lambda x: self.input_dict.update({"Revised Professional Summary": x}) or all_sections.append("Revised Professional Summary"))
+            | RunnableLambda(lambda x: self.input_dict.update({"revised_prof_summary": x}) or all_sections.append("revised_prof_summary"))
         )
-        professional_summary_chain.invoke({})
+        prof_summary_revision_chain.invoke(self.input_dict)
+        self._assess_completion(15, "Generating Cover Letter based on candidate's resume content and job posting analysis")
 
-        percent_complete+=10
-        progress_bar.progress(percent_complete, "Revising candidate's Summary of Skills")
-        generating_summary_of_skills = ChatPromptTemplate.from_messages([
-            ("system", prompts.chain_4a_generate_summary_of_skills),
-            ("ai", "Understood, please see below.")
-        ])
-        summary_skills_chain = (
-            generating_summary_of_skills
-            | self.model
-            | StrOutputParser()
-            | RunnableLambda(lambda x: self.input_dict.update({"Revised Summary of Skills": x}) or all_sections.append("Revised Summary of Skills"))
-        )
-        
-        summary_skills_chain.invoke({})
-
-        percent_complete+=7
-        progress_bar.progress(percent_complete, "Generating Cover Letter")
-
-        generating_cover_letter = ChatPromptTemplate.from_messages([
-            ("system", prompts.chain_5a_generate_cover_letter),
-            ("ai", "Understood, I'll wait for the remaining information to complete the steps outlined."),
-            ("human", f"*Job Analysis*: {self.input_dict["Job Analysis"]}; *Work Experience: {self.input_dict["Revised Work Experience"]}; *Professional Summary*: {self.input_dict["Revised Professional Summary"]}"),
-            ("ai", "I will now perform the steps outlined utilizing the information provided to me. See below Cover Letter:")
-        ])
+        # Stage 5: Generate Messaging
         cover_letter_chain = (
-            generating_cover_letter
+            generate_cover_letter()
             | self.model
             | StrOutputParser()
-            | RunnableLambda(lambda x: self.input_dict.update({"Cover Letter": x}) or all_sections.append("Cover Letter"))
+            | RunnableLambda(lambda x: self.input_dict.update({"cover_letter": x}) or all_sections.append("cover_letter"))
         )
-        cover_letter_chain.invoke({})
+        cover_letter_chain.invoke(self.input_dict)
+        self._assess_completion(10, "Generating Hiring Manager message")
 
-
-        percent_complete+=8
-        progress_bar.progress(percent_complete, "Generating Short Email")
-        short_email_chain = (
-            ChatPromptTemplate.from_messages([
-                ("system", f"Write a short and sweet email to an HR rep to express my interest in the role and keep it short and simple. Try to get her to join a call to discuss my skills and expertise and why I'm a good fit. Don't be afraid to show in why I'm a good fit and cover off any weaknesses.. Use the candidate analysis on my experience compared to the job posting. *Candidate Analysis*: {self.input_dict["Candidate Analysis"]}"),
-            ])
+        hiring_manager_chain = (
+            generate_message_to_hiring_manager()
             | self.model
             | StrOutputParser()
-            | RunnableLambda(lambda x: self.input_dict.update({"Short Email": x}) or all_sections.append("Short Email"))
+            | RunnableLambda(lambda x: self.input_dict.update({"hiring_manager_message": x}) or all_sections.append("hiring_manager_message"))
         )
-        short_email_chain.invoke({})
-        
-        all_sections.extend(["Candidate's Existing Working Experience", "Candidate's Existing Professional Summary"])
+        hiring_manager_chain.invoke(self.input_dict)        
+
+        self._assess_completion(-self.percent_complete, "Complete")
         self._display_results(all_sections)
-        percent_complete+=5
-        progress_bar.progress(0, "Complete")
 
     def _display_results(self, section_list: list):
             # """Display the generated results in Streamlit expandable sections."""
-            revision_tab, analysis_tab, ai_content = st.tabs(["Revised Bullet Points", "Analysis", "AI Generated Content"])
             for section in section_list:
-                print(f"Section: {section}")
-                if section == "Revised Work Experience":
-                    for item in self.input_dict[section]:
-                        print(f"item: {item}")
-                        with revision_tab:
-                            with st.expander(section):
-                                    st.write(item)
-                elif section == "Revised Professional Summary":
-                    with revision_tab:
-                        with st.expander(section):
+                if section == "ai_prof_summary":
+                    with self.ai_content:
+                        with st.expander("AI Professional Summary"):
                             st.write(self.input_dict[section])
-                elif section == "Revised Summary of Skills":
-                    with revision_tab:
-                        with st.expander(section):
+                elif section == "ai_work_exp":
+                    with self.ai_content:
+                        with st.expander("AI Work Experience"):
                             st.write(self.input_dict[section])
-                elif section == "Suggested Career Taglines":
-                    with ai_content:
-                        with st.expander(section):
+                elif section == "ai_career_taglines":
+                    with self.ai_content:
+                        with st.expander("AI Career Taglines"):
                             st.write(self.input_dict[section])
-                elif section == "Job Analysis":
-                    with analysis_tab:
-                        with st.expander(section):
+                elif section == "ai_summary_of_skills":
+                    with self.ai_content:
+                        with st.expander("AI Summary of Skills"):
                             st.write(self.input_dict[section])
-                elif section == "Candidate Analysis":
-                    with analysis_tab:
-                        with st.expander(section):
+                elif section == "job_posting_analysis":
+                    with self.analysis_tab:
+                        with st.expander("Job Posting Analysis"):
                             st.write(self.input_dict[section])
-                elif section == "Cover Letter":
-                    with ai_content:
-                        with st.expander(section):
+                elif section == "candidate_analysis":
+                    with self.analysis_tab:
+                        with st.expander("Candidate Analysis"):
                             st.write(self.input_dict[section])
-                elif section == "Short Email":
-                    with ai_content:
-                        with st.expander(section):
+                elif section =="revised_prof_summary":
+                    with self.revision_tab:
+                        with st.expander("Revised Professional Summary"):
                             st.write(self.input_dict[section])
-                elif section == "Suggested Work Experience":
-                    with ai_content:
-                        with st.expander(section):
-                            st.write(self.input_dict["Suggested Work Experience"])
-                elif section == "Suggested Professional Summary":
-                    with ai_content:
-                        with st.expander(section):
-                            st.write(self.input_dict["Suggested Professional Summary"])
-                elif section == "Suggested Summary of Skills":
-                    with ai_content:
-                        with st.expander(section):
-                            st.write(self.input_dict["Suggested Summary of Skills"])
+                elif section =="revised_work_exp":
+                    with self.revision_tab:
+                        with st.expander("Revised Work Experience"):
+                            st.write(self.input_dict[section])
+                elif section == "candidate_experience_list":
+                    with self.revision_tab:
+                        with st.expander("Current Experience"):
+                            st.write(self.input_dict["candidate_experience_list"])
+                elif section == "cover_letter":
+                    with self.revision_tab:
+                        with st.expander("Cover Letter"):
+                            st.write(self.input_dict["cover_letter"])
+                elif section == "hiring_manager_message":
+                    with self.revision_tab:
+                        with st.expander("Message to Hiring Manager"):
+                            st.write(self.input_dict["hiring_manager_message"])
                 else:
                     next
 
 def run_chain(llm_selection: str, model_selection: str, job_posting: str):
     """Main function to run the resume generation pipeline."""
+    print("NEW RUN")
+    print("")
     generator = ResumeGenerator(llm_selection, model_selection, job_posting)
     generator.run()

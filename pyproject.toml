@@ -1,7 +1,7 @@
 [project]
 name = "react-resume-uv"
 version = "0.0.2"
-description = "Integrating OpenAI and possibly other LLMs to initialize the 'Create Resume' page"
+description = "Integrating OpenAI for the 'create resume' functionality. Optimized for OpenAI o3-mini. o4-mini seems to be almost 'too good'."
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
