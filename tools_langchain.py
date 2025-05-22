@@ -22,7 +22,7 @@ def create_llm_model(llm_selection: str, model_selection: str):
         llm_selection str: The LLM model of choice to complete the resume and job posting analysis.
             Google Gemini = GoogleGemini\n
             OpenAI = OpenAI\n
-        model_selection str. The specific model of the LLM model.
+        model_selection str: The specific model of the LLM model.
             OpenAI o3-mini-2025-01-31 = o3-mini-2025-01-31\n
             OpenAI o1-mini-2024-09-12 = o1-mini-2024-09-12\n
             OpenAI gpt-4o-2024-08-06 = gpt-4o-2024-08-06\n
