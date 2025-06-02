@@ -5,7 +5,14 @@ from tools_general import login_user
 from tools_langchain import run_chain
 from tools_firebase import get_firestore_value
 from tools_langchain import get_resume_information_in_list
+from tools_langgraph import run_chatbot
+from langchain.chat_models import init_chat_model
 
+import os
+os.environ["LANGSMITH_TRACING"] = st.secrets.langsmith.tracing
+os.environ["LANGSMITH_ENDPOINT"] = st.secrets.langsmith.endpoint
+os.environ["LANGSMITH_API_KEY"] = st.secrets.langsmith.api_key
+os.environ["LANGSMITH_PROJECT"] = st.secrets.langsmith.project
 
 if not st.experimental_user.is_logged_in:
     login_user()
@@ -37,8 +44,13 @@ else:
                                   options=model_options[llm_selection]['options'],
                                   index=1,
                                   key="model_selection")
-
-    job_posting = st.text_area("Input your job description", height=300)
     
-    if st.button("Create Resume", key="create_resume", type="primary"):
-        run_chain(model_options[llm_selection]['langchain_model'], model_selection, job_posting)
+    job_posting = st.text_area("Input your job description", height=300, key="job_posting")
+    
+    if job_posting:
+        if llm_selection == "OpenAI":
+            api_key = st.secrets.llm_keys.openai_key
+        elif llm_selection == "Google Gemini":
+            api_key = st.secrets.llm_keys.google_gemini_key
+        llm = init_chat_model(model=model_selection, api_key=api_key)
+        run_chatbot()
