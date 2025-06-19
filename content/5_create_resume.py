@@ -1,14 +1,17 @@
 import streamlit as st
-from langchain_openai import ChatOpenAI
+from langchain_core.messages import AnyMessage, HumanMessage, ToolMessage, SystemMessage, AIMessage
 
 from tools_general import login_user
-from tools_langchain import run_chain
-from tools_firebase import get_firestore_value
-from tools_langchain import get_resume_information_in_list
+from tools_firebase import get_firestore_value, get_user_information, get_resume_formatted_for_llm
+from tools_langgraph import create_graph
+from session_log import _get_session
+import pprint
 
 
 if not st.experimental_user.is_logged_in:
     login_user()
+
+
 
 elif not get_firestore_value("subscription_status", "subscription_status").get("premium"):
     st.warning("Need to be paid premium user")
@@ -37,8 +40,34 @@ else:
                                   options=model_options[llm_selection]['options'],
                                   index=1,
                                   key="model_selection")
-
-    job_posting = st.text_area("Input your job description", height=300)
     
-    if st.button("Create Resume", key="create_resume", type="primary"):
-        run_chain(model_options[llm_selection]['langchain_model'], model_selection, job_posting)
+
+    st.button("Clear Chat", on_click=lambda: st.session_state.messages.clear())
+    if 'graph' not in st.session_state:
+        st.session_state.session_id = _get_session()
+        st.session_state.messages =[]
+        st.session_state.config = {"configurable": {"thread_id": str(_get_session())}}
+        st.session_state.graph = create_graph(llm = llm_selection, llm_model=model_selection)
+
+    chat_input_col1, chat_output_col2 = st.columns([3,1])
+    if prompt := chat_input_col1.chat_input():
+        st.session_state.messages.append({"role": "user", "content": prompt})  # Store messages as dict
+        st.chat_message("human").write(prompt)
+        
+        response = st.session_state.graph.invoke({"messages": st.session_state.messages})  # Pass as dict
+        final_response = None
+        if 'messages' in response and isinstance(response['messages'], list) and response['messages']:
+            msg = response['messages'][-1]
+            if (hasattr(msg, 'content') and 
+                msg.__class__.__name__ == 'AIMessage' and 
+                msg.content and 
+                msg.content.strip()):
+                final_response = msg.content
+
+        if final_response:
+            st.chat_message("assistant").write(final_response)
+            st.session_state.messages.append({"role": "assistant", "content": final_response})
+        else:
+            st.error("No valid response received")
+
+    chat_output_col2.write(st.experimental_user.email)

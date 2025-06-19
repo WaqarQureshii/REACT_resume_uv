@@ -1,11 +1,16 @@
 from google.cloud import firestore
 import streamlit as st
 from google.cloud.firestore_v1.collection import CollectionReference
+from typing import Literal, Union
 
 import datetime
 
 def create_user_db(db: firestore.DocumentReference):
     # Instantiate User Document in Firestore
+    
+    print("Running from create_user_db (firebase tools)")
+    print(st.experimental_user.email)
+    print("")
     db.set({
             "date_joined": datetime.datetime.now(),
             "fullname": st.experimental_user.name
@@ -34,7 +39,8 @@ def create_user_db(db: firestore.DocumentReference):
     return db
 
 def get_user_db() -> firestore.DocumentReference:
-    db = firestore.Client.from_service_account_info(st.secrets["GOOGLE_APPLICATION_CREDENTIALS"]).collection("users").document(st.experimental_user.email)
+    user_email = st.experimental_user["email"]
+    db = firestore.Client.from_service_account_info(st.secrets["GOOGLE_APPLICATION_CREDENTIALS"]).collection("users").document(user_email)
     if db.get().to_dict():
         return db
     else:
@@ -101,12 +107,12 @@ def delete_firestore_document(firestore_collection_name: str, firestore_document
     db = get_user_db()
     db.collection(firestore_collection_name).document(firestore_document_name).delete()
 
-def get_resume_formatted_for_llm(collection_type: str) -> str:
+def get_resume_formatted_for_llm(collection_type: Literal["experience", "summary", "education", "contact"]) -> str:
     Candidate_db = get_user_db()
     collections = Candidate_db.collection(collection_type)
 
     result = []  # Holds properly formatted job experience blocks
-
+    
     for doc in collections.stream():
         data = doc.to_dict()
         
@@ -176,3 +182,83 @@ def get_resume_formatted_for_llm(collection_type: str) -> str:
 
 
     return "\n\n".join(result).strip()
+
+def get_user_information(collection_type: Literal["experience", "summary", "education", "contact"]) -> Union[list[dict], dict]:
+    """Fetches user information from the firestore database based on the collection type provided.
+    
+    Args:
+        collection_type (Literal["experience", "summary", "education", "contact"]): The type of collection to fetch user information from.
+        "experience" for work experience
+        "summary" for professional summary
+        "education" for education qualifications
+        "contact" for basic contact information
+
+    Return (ResumeState)
+    """
+
+    Candidate_db = get_user_db()
+    collections = Candidate_db.collection(collection_type)
+
+    output_dict = []
+
+    for doc in collections.stream():
+        
+        data = doc.to_dict()
+        
+        if collection_type == "experience":
+            experiences = [f"- {value}" for key, value in data.items() if key.startswith("experience_description") and value]
+            
+            item = {
+                "organization_name": data.get("organization", "User did not input organization name."),
+                "linked_in_url": data.get("linkedin_url", "User did not input LinkedIN URL."),
+                "job_location": data.get("location", "User did not input job location."),
+                "job_title": data.get("role", "User did not input job title."),
+                "start_date": data.get("start_date", "User did not input start date."),
+                "end_date": data.get("end_date", "User did not input end date."),
+                "present_role": data.get("present"),
+                "responsibilities": experiences if experiences else "User did not input any experiences"
+            }
+            output_dict.append(item)
+
+
+        if collection_type == "summary":
+            skill_or_achievement = data.get("skill", "User did not provide a skill/achievement.")
+            summary = data.get("description", "User did not provide a summary or description.")
+            entry = skill_or_achievement + ": " + summary
+
+            item = {
+                "skill_and_summary": entry
+            }
+            output_dict.append(item)
+
+
+        if collection_type == "education":
+            item = {
+                "degree_or_diploma_name": data.get("degree", "User did not input a degree or deploma name."),
+                "institution_name": data.get("institution", "User did not input an institution name."),
+                "year_earned": data.get("year_earned", "User did not input the year it was earned."),
+                "location": data.get("location", "User did not input the location of the institution."),
+                "specialization": data.get("specialist", "User did not input a specialization."),
+                "major": data.get("major", "User did not input a major."),
+                "minor": data.get("minor", "User did not input a minor."),
+                "additional_info": data.get("additional_info", "User did not input any additional information.")
+            }
+            output_dict.append(item)
+            
+
+        if collection_type == "contact":
+            item = {
+                "first_name": data.get("first_name", "User did not input their first name."),
+                "last_name": data.get("last_name", "User did not input their last name."),
+                "email": data.get("emaiL_address", "User did not input their email address."),
+                "contact_linkedin_url": data.get("linkedin_url", "User did not provide their LinkedIN URL."),
+                "phone_number": data.get("phone_number", "User did not provider their phone number."),
+                "personal_website": data.get("personal_website", "User did not provide their personal website."),
+                "country": data.get("country", "User did not provide their residential country."),
+                "state_province": data.get("state", "User did not provide their residential province/state."),
+                "city": data.get("city", "User did not provide their residential city.")
+            }
+            output_dict = item
+
+
+    return output_dict
